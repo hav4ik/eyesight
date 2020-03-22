@@ -1,0 +1,8 @@
+# VIM stuffs
+*.sw[pon]
+
+# Python stuffs
+*.egg-info
+*.pyc
+*__pycache__*
+
