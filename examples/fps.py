@@ -2,7 +2,7 @@ import datetime
 import time
 import os
 from imutils.video import FPS
-from pai.utils import Log
+from pai.utils import log
 
 if 'CAMERA' in os.environ:
     if os.environ['CAMERA'] == 'pi':
@@ -24,7 +24,7 @@ else:
 
 
 stream = Service(Camera())
-Log.info('Start measuring')
+log.info('Start measuring')
 
 fps = FPS().start()
 while fps._numFrames < 200 and \
@@ -33,6 +33,6 @@ while fps._numFrames < 200 and \
     fps.update()
 fps.stop()
 
-Log.info('Elapsed time: {:.2f}'.format(fps.elapsed()))
-Log.info('Approx. FPS: {:.2f}'.format(fps.fps()))
+log.info('Elapsed time: {:.2f}'.format(fps.elapsed()))
+log.info('Approx. FPS: {:.2f}'.format(fps.fps()))
 

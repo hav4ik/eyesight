@@ -3,7 +3,7 @@ import os
 
 from flask import Flask, render_template, Response
 import cv2
-from pai.utils import Log
+from pai.utils import log
 
 if 'CAMERA' in os.environ:
     if os.environ['CAMERA'] == 'pi':

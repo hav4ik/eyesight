@@ -1,63 +1,120 @@
-import os
-import logging
 import threading
+import colorlog
+import logging
 import pathlib
+import shutil
+import wget
+import os
 
 
 class Log:
-    """Monostate singleton color logger"""
+    aliases = {
+        logging.CRITICAL: ("critical", "crit", "c", "fatal"),
+        logging.ERROR:    ("error", "err", "e"),
+        logging.WARNING:  ("warning", "warn", "w"),
+        logging.INFO:     ("info", "inf", "nfo", "i"),
+        logging.DEBUG:    ("debug", "dbg", "d")
+    }
 
-    class CustomFormatter(logging.Formatter):
-        """Logging Formatter to add colors and count warning / errors"""
+    lvl = logging.DEBUG
+    format_str = "%(log_color)s%(asctime)s | %(levelname)-8s | " \
+                 "%(message)s (%(filename)s:%(lineno)d)%(reset)s"
+    logging.root.setLevel(lvl)
+    formatter = colorlog.ColoredFormatter(
+            format_str, datefmt="%H:%M:%S", reset=True,
+            log_colors={
+                'DEBUG': 'cyan',
+                'INFO': 'reset',
+                'WARNING': 'yellow',
+                'ERROR': 'red',
+                'CRITICAL': 'bold_red',
+            })
 
-        grey = "\x1b[38m"
-        yellow = "\x1b[33m"
-        red = "\x1b[31m"
-        bold_red = "\x1b[31;1m"
-        reset = "\x1b[0m"
-        format_str = "%(asctime)s - %(levelname)s - " \
-                "%(message)s (%(filename)s:%(lineno)d)"
+    stream = logging.StreamHandler()
+    stream.setLevel(lvl)
+    stream.setFormatter(formatter)
+    logger = logging.getLogger('eyesight')
+    logger.setLevel(lvl)
+    logger.addHandler(stream)
 
-        FORMATS = {
-            logging.DEBUG: grey + format_str + reset,
-            logging.INFO: grey + format_str + reset,
-            logging.WARNING: yellow + format_str + reset,
-            logging.ERROR: red + format_str + reset,
-            logging.CRITICAL: bold_red + format_str + reset
-        }
+    crit = c = fatal = critical = logger.critical
+    err = e = error = logger.error
+    warning = w = warn = logger.warning
+    inf = nfo = i = info = logger.info
+    dbg = d = debug = logger.debug
 
-        def format(self, record):
-            log_fmt = self.FORMATS.get(record.levelno)
-            formatter = logging.Formatter(log_fmt, "%H:%M:%S")
-            return formatter.format(record)
+    @classmethod
+    def _parse_level(cls, lvl):
+        for log_level in cls.aliases:
+            if lvl == log_level or lvl in cls.aliases[log_level]:
+                return log_level
+        raise TypeError("Unrecognized logging level: %s" % lvl)
 
-    # Configuration states
-    DEBUG = logging.DEBUG
-    INFO = logging.INFO
-    WARNING = logging.WARNING
-    ERROR = logging.ERROR
-    CRITICAL = logging.CRITICAL
+    @classmethod
+    def level(cls, lvl=None):
+        '''Get or set the logging level.'''
+        if not lvl:
+            return cls._lvl
+        cls._lvl = cls._parse_level(lvl)
+        cls.stream.setLevel(cls._lvl)
+        logging.root.setLevel(cls._lvl)
 
-    # Initializing _logger and _console_handler
-    _logger = logging.getLogger('pai')
-    _logger.setLevel(DEBUG)
-    _console_handler = logging.StreamHandler()
-    _console_handler.setLevel(DEBUG)
-    _console_handler.setFormatter(CustomFormatter())
-    _logger.addHandler(_console_handler)
 
-    # primary mappings
-    debug = _logger.debug
-    info = _logger.info
-    warning = _logger.warning
-    error = _logger.error
-    critical = _logger.critical
+log = Log()
+if 'VERBOSE' in os.environ:
+    log.level(os.environ['VERBOSE'])
+
+
+class Resource:
+    def __init__(self, collection_name, url, is_archive=False, root_dir=None):
+
+        # Creating, if necessary, the root directory of resources
+        if root_dir is None:
+            if 'EYESIGHTDIR' in os.environ:
+                root_dir = os.environ['EYESIGHTDIR']
+            else:
+                root_dir = '~/.eyesight/'
+        root_dir = os.path.expanduser(root_dir)
+        if not os.path.isdir(root_dir):
+            os.makedirs(root_dir)
+
+        # making, if necessary, the directory for this collection
+        collection_dir = os.path.join(root_dir, collection_name)
+        if not os.path.isdir(collection_dir):
+            os.makedirs(collection_dir)
+
+        # retrieving resource path
+        self._path = self.retrieve(url, collection_dir)
+
+    def path(self):
+        return self._path
 
     @staticmethod
-    def set_level(level):
-        Log._logger.setLevel(level)
-        Log._console_handler.setLevel(level)
+    def retrieve(url, folder, is_archive=False):
+        file_name = os.path.basename(url)
+        download_path = os.path.join(folder, file_name)
 
+        formats = [".zip", ".tar", ".gztar", ".bztar", ".xztar"]
+        if is_archive:
+            for dirname in [
+                    download_path.rsplit(f, 1)[0] for f in formats
+                    if f in download_path]:
+                if os.path.isdir(dirname):
+                    return dirname
+        else:
+            if os.path.exists(download_path):
+                return download_path
 
-def get_models_path():
-    return os.path.join(pathlib.Path(__file__).parent, 'models')
+        if not os.path.exists(download_path):
+            wget.download(url, download_path)
+
+        if is_archive:
+            shutil.unpack_archive(download_path, folder)
+            os.remove(download_path)
+            for dirname in [
+                    download_path.rsplit(f, 1)[0] for f in formats
+                    if f in download_path]:
+                if os.path.isdir(dirname):
+                    return dirname
+        else:
+            return download_path

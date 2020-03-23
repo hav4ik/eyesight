@@ -1,6 +1,6 @@
 import os
-import time
 import threading
+import logging
 
 from PIL import Image
 from PIL import ImageDraw
@@ -13,11 +13,10 @@ import collections
 import numpy as np
 
 from pai.services import BaseStreamService
-from pai.utils import get_models_path, Log
+from pai.utils import Resource, log
 
 Object = collections.namedtuple('Object', ['id', 'score', 'bbox'])
 
-import logging
 pil_logger = logging.getLogger('PIL')
 pil_logger.setLevel(logging.INFO)
 
@@ -31,8 +30,8 @@ EDGETPU_SHARED_LIB = {
 class BBox(collections.namedtuple('BBox', ['xmin', 'ymin', 'xmax', 'ymax'])):
     """Bounding box.
 
-    Represents a rectangle which sides are either vertical or horizontal, parallel
-    to the x or y axis.
+    Represents a rectangle which sides are either vertical or horizontal,
+    parallel to the x or y axis.
     """
     __slots__ = ()
 
@@ -55,8 +54,8 @@ class BBox(collections.namedtuple('BBox', ['xmin', 'ymin', 'xmax', 'ymax'])):
     def valid(self):
         """Returns whether bounding box is valid or not.
 
-        Valid bounding box has xmin <= xmax and ymin <= ymax which is equivalent to
-        width >= 0 and height >= 0.
+        Valid bounding box has xmin <= xmax and ymin <= ymax which is
+        equivalent to width >= 0 and height >= 0.
         """
         return self.width >= 0 and self.height >= 0
 
@@ -125,8 +124,8 @@ def set_input(interpreter, size, resize):
     Args:
         interpreter: Interpreter object.
         size: original image size as (width, height) tuple.
-        resize: a function that takes a (width, height) tuple, and returns an RGB
-            image resized to those dimensions.
+        resize: a function that takes a (width, height) tuple, and returns an
+            RGB image resized to those dimensions.
     Returns:
         Actual resize ratio, which should be passed to `get_output` function.
     """
@@ -169,6 +168,7 @@ def get_output(interpreter, score_threshold, image_scale=(1.0, 1.0)):
                           ymax=ymax).scale(sx, sy).map(int))
 
     return [make(i) for i in range(count) if scores[i] >= score_threshold]
+
 
 def load_labels(path, encoding='utf-8'):
     """Loads labels from file (with or without index numbers).
@@ -230,18 +230,21 @@ class ObjectDetector(BaseStreamService):
         cls.camlock.acquire()
         cls.camera = camera
         cls.camlock.release()
-        Log.info('Camera is set to {}'.format(
+        log.info('Camera is set to {}'.format(
             '.'.join([type(camera).__module__, type(camera).__name__])))
 
     @staticmethod
     def frames():
-        root_dir = os.path.join(get_models_path(), 'mobilenet_ssd_v2_coco')
-        labels_path = os.path.join(root_dir, 'coco_labels.txt')
-        model_path = os.path.join(
-                root_dir,
-                'mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite')
-        if not os.path.isfile(labels_path) or not os.path.isfile(model_path):
-            raise RuntimeError('Models not found in {}'.format(root_dir))
+        model_path = Resource(
+                collection_name='mobilenet_ssd_v2_coco',
+                url='https://github.com/google-coral/' \
+                    'edgetpu/raw/master/test_data/' \
+                    'mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite'
+        ).path()
+        labels_path = Resource(
+                collection_name='mobilenet_ssd_v2_coco',
+                url='https://dl.google.com/coral/canned_models/coco_labels.txt'
+        ).path()
 
         labels = load_labels(labels_path)
         interpreter = make_interpreter(model_path)

@@ -3,7 +3,7 @@ import threading
 import os
 
 from readerwriterlock import rwlock
-from pai.utils import Log
+from pai.utils import log
 
 
 class ClientEventHandler:
@@ -77,7 +77,7 @@ class BaseStreamService:
             cls.thread.start()
             while cls.get_frame()[1] is None:
                 time.sleep(0.01)
-            Log.info('{:s} initialized in {:.6f} seconds.'.format(
+            log.info('{:s} initialized in {:.6f} seconds.'.format(
                     '.'.join([cls.__module__, cls.__name__]),
                     time.time() - begin))
 
@@ -103,7 +103,7 @@ class BaseStreamService:
 
             if time.time() - cls.last_access > 10:
                 frames_iterator.close()
-                Log.warning(
+                log.warning(
                         'Stopping {} due to inactivity for 10 seconds.'
                         .format('.'.join([cls.__module__, cls.__name__])))
                 break
