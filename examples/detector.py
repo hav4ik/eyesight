@@ -3,8 +3,8 @@ import os
 
 from flask import Flask, render_template, Response
 import cv2
-from pai.utils import log
 
+from pai.services import ObjectDetector
 if 'CAMERA' in os.environ:
     if os.environ['CAMERA'] == 'pi':
         from pai.services import PiCamera as Camera
@@ -14,11 +14,6 @@ if 'CAMERA' in os.environ:
         raise RuntimeError('Unknown CAMERA specified.')
 else:
     from pai.services import DefaultCamera as Camera
-
-# Raspberry Pi camera module (requires picamera package)
-# from camera_pi import Camera
-
-from pai.services import ObjectDetector
 
 
 app = Flask(__name__)

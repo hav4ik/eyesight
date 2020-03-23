@@ -1,0 +1,14 @@
+# Misc
+colorlog>=4.1.0
+readerwriterlock>=1.0.6
+wget>=3.2
+
+# For computer vision stuffs
+numpy>=1.17.0
+opencv-python>=3.1.0
+tflite-runtime>=2.1.0.post1
+Pillow>=7.0.0
+imutils>=0.5.3
+
+# For in-browser demos
+Flask>=1.1.1

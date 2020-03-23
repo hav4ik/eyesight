@@ -1,5 +1,4 @@
 import datetime
-import time
 import os
 from imutils.video import FPS
 from pai.utils import log
@@ -20,7 +19,7 @@ if 'SERVICE' in os.environ:
     else:
         raise RuntimeError('Unknown SERVICE specified.')
 else:
-    Service = lambda x: x
+    def Service(x): return x
 
 
 stream = Service(Camera())
@@ -35,4 +34,3 @@ fps.stop()
 
 log.info('Elapsed time: {:.2f}'.format(fps.elapsed()))
 log.info('Approx. FPS: {:.2f}'.format(fps.fps()))
-
