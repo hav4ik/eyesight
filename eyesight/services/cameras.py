@@ -19,17 +19,50 @@ except ImportError:
     HAS_OPENCV = False
 
 
-class DefaultCamera(BaseService):
-    """Just for basic testing"""
-
-    def __init__(self):
-        super().__init__()
+class EmptyCamera(BaseService):
+    """Just for basic testing
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
     def _generator(self):
         img = np.zeros((256, 256, 3), dtype=np.uint8)
         while True:
             img = 255 - img
             yield img
+
+
+class ImageCamera(BaseService):
+    """To test computer vision algorithms
+    """
+    def __init__(self, images, *args, **kwargs):
+        if not HAS_OPENCV:
+            raise NotImplementedError('OpenCV required')
+
+        self.images = []
+        if isinstance(images, str):
+            self.images = self._get_image_or_imdir(
+                    os.path.expanduser(images))
+        elif isinstance(images, list):
+            for path in images:
+                self.images.extend(self._get_image_or_imdir(
+                    os.path.expanduser(path)))
+        super().__init__(*args, **kwargs)
+
+    def _generator(self):
+        while True:
+            for path in self.images:
+                img = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
+                yield img
+
+    @staticmethod
+    def _get_image_or_imdir(path):
+        if os.path.isdir(path):
+            return [os.path.join(path, x) for x in os.listdir(path)]
+        elif os.path.isfile(path):
+            return [path]
+        else:
+            raise RuntimeError('Path {} does not exist.'.format(path))
 
 
 class PiCamera(BaseService):
@@ -39,7 +72,9 @@ class PiCamera(BaseService):
                  resolution=(640, 480),
                  framerate=32,
                  sensor_mode=1,
-                 flipud=False):
+                 flipud=False,
+                 *args,
+                 **kwargs):
 
         if not PLATFORM_RPI:
             raise NotImplementedError('Only available for Raspberry Pi')
@@ -47,7 +82,7 @@ class PiCamera(BaseService):
         self.resolution = resolution
         self.framerate = framerate
         self.sensor_mode = sensor_mode
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
     def _generator(self):
         with picamera.PiCamera() as camera:
@@ -61,7 +96,7 @@ class PiCamera(BaseService):
             time.sleep(2)
 
             for _ in camera.capture_continuous(
-                    raw_capture, format='bgr', use_video_port=True):
+                    raw_capture, format='rgb', use_video_port=True):
                 yield raw_capture.array
                 raw_capture.truncate(0)
 
@@ -69,7 +104,7 @@ class PiCamera(BaseService):
 class CVCamera(BaseService):
     """WebCam service"""
 
-    def __init__(self, video_source=0):
+    def __init__(self, video_source=0, *args, **kwargs):
         if not HAS_OPENCV:
             raise NotImplementedError('OpenCV required')
 
@@ -78,7 +113,7 @@ class CVCamera(BaseService):
                     int(os.environ['OPENCV_CAMERA_SOURCE'])
 
         self.video_source = video_source
-        super().__init__()
+        super().__init__(*args, **kwargs)
 
     def _generator(self):
         camera = cv2.VideoCapture(self.video_source)

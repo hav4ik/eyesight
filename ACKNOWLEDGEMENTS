@@ -4,12 +4,13 @@ detailed description on changes or improvements made, and corresponding license
 notices:
 
 
-+--------------------------------------------+
-| Files:                                     |
-|   - eyesight/services/detector.py          |
-| Original repository:                       |
-|   - https://github.com/google-coral/tflite |
-+--------------------------------------------+
++---------------------------------------------+
+| Files:                                      |
+|   - eyesight/services/detector.py           |
+|   - eyesight/services/segmentation.py       |
+| Original repository:                        |
+|   - https://github.com/google-coral/edgetpu |
++---------------------------------------------+
 
 Changes and improvements made: TF-Lite inference utility functions were copied.
 Replaced PIL with cv2 for image post- and pre-processing, as cv2 is faster in

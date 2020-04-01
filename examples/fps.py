@@ -10,8 +10,8 @@ if 'CAMERA' in os.environ:
         from eyesight.services import PiCamera as Camera
     elif os.environ['CAMERA'] == 'opencv':
         from eyesight.services import CVCamera as Camera
-    elif os.environ['CAMERA'] == 'test':
-        from eyesight.services import DefaultCamera as Camera
+    elif os.environ['CAMERA'] == 'img':
+        from eyesight.services import ImageCamera as Camera
     else:
         raise RuntimeError('Unknown CAMERA specified.')
 else:
