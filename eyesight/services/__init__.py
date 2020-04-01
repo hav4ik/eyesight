@@ -1,4 +1,4 @@
-from .base_service import BaseStreamService
+from ..engine.base_service import BaseService
 
 from .cameras import DefaultCamera
 from .cameras import PiCamera

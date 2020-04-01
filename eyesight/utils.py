@@ -2,8 +2,10 @@ import threading
 import colorlog
 import logging
 import pathlib
+import inspect
 import shutil
 import wget
+import sys
 import os
 
 
@@ -118,3 +120,80 @@ class Resource:
                     return dirname
         else:
             return download_path
+
+
+def _parent_frame(skip=1):
+    """Get the object of caller (parent frame)
+    """
+    def stack_(frame):
+        framelist = []
+        while frame:
+            framelist.append(frame)
+            frame = frame.f_back
+        return framelist
+
+    stack = stack_(sys._getframe(1))
+    start = 0 + skip
+    if len(stack) < start + 1:
+        return ''
+    return stack[start]
+
+
+def caller_name(skip=1):
+    """
+    Get a name of a caller in the format module.class.method
+
+    `skip` specifies how many levels of stack to skip while getting caller
+    name. skip=1 means "who calls me", skip=2 "who calls my caller" etc.
+
+    An empty string is returned if skipped levels exceed stack height
+    """
+    parentframe = _parent_frame(skip)
+
+    name = []
+    module = inspect.getmodule(parentframe)
+    # `modname` can be None when frame is executed directly in console
+    # TODO(techtonik): consider using __main__
+    if module:
+        name.append(module.__name__)
+    # detect classname
+    if 'self' in parentframe.f_locals:
+        # I don't know any way to detect call from the object method
+        # XXX: there seems to be no way to detect static method call - it will
+        #      be just a function call
+        name.append(parentframe.f_locals['self'].__class__.__name__)
+    codename = parentframe.f_code.co_name
+    if codename != '<module>':  # top level usually
+        name.append(codename)  # function or a method
+    del parentframe
+    return ".".join(name)
+
+
+def caller_class_name(skip=1):
+    """
+    Get a name of a caller's class in the format module.class
+
+    `skip` specifies how many levels of stack to skip while getting caller
+    name. skip=1 means "who calls me", skip=2 "who calls my caller" etc.
+
+    An empty string is returned if skipped levels exceed stack height
+    """
+    parentframe = _parent_frame(skip)
+    name = []
+    module = inspect.getmodule(parentframe)
+    # `modname` can be None when frame is executed directly in console
+    # TODO(techtonik): consider using __main__
+    if module:
+        name.append(module.__name__)
+    # detect classname
+    if 'self' in parentframe.f_locals:
+        # I don't know any way to detect call from the object method
+        # XXX: there seems to be no way to detect static method call - it will
+        #      be just a function call
+        name.append(parentframe.f_locals['self'].__class__.__name__)
+    del parentframe
+    return ".".join(name)
+
+
+def class_name(obj):
+    return '.'.join([type(obj).__module__, type(obj).__name__])

@@ -1,21 +1,25 @@
+import time
 import datetime
 import os
+
 from imutils.video import FPS
-from pai.utils import log
+from eyesight.utils import log
 
 if 'CAMERA' in os.environ:
     if os.environ['CAMERA'] == 'pi':
-        from pai.services import PiCamera as Camera
+        from eyesight.services import PiCamera as Camera
     elif os.environ['CAMERA'] == 'opencv':
-        from pai.services import CVCamera as Camera
+        from eyesight.services import CVCamera as Camera
+    elif os.environ['CAMERA'] == 'test':
+        from eyesight.services import DefaultCamera as Camera
     else:
         raise RuntimeError('Unknown CAMERA specified.')
 else:
-    from pai.services import DefaultCamera as Camera
+    from eyesight.services import DefaultCamera as Camera
 
 if 'SERVICE' in os.environ:
     if os.environ['SERVICE'] == 'det':
-        from pai.services import ObjectDetector as Service
+        from eyesight.services import ObjectDetector as Service
     else:
         raise RuntimeError('Unknown SERVICE specified.')
 else:
@@ -23,14 +27,19 @@ else:
 
 
 stream = Service(Camera())
+stream.start()
 log.info('Start measuring')
 
 fps = FPS().start()
+delta = 0.
 while fps._numFrames < 200 and \
         (datetime.datetime.now() - fps._start).total_seconds() < 10:
-    t, frame = stream.get_frame()
+    history, frame = stream.query()
+    delta += time.time() - history[0].timestamp
     fps.update()
 fps.stop()
+delta /= fps._numFrames
 
 log.info('Elapsed time: {:.2f}'.format(fps.elapsed()))
 log.info('Approx. FPS: {:.2f}'.format(fps.fps()))
+log.info('Average delay: {:.2f}'.format(delta))

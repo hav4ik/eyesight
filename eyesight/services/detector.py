@@ -1,30 +1,22 @@
-import os
-import threading
-import logging
-
-from PIL import Image
-from PIL import ImageDraw
-import cv2
-
-import tflite_runtime.interpreter as tflite
+import collections
 import platform
 
-import collections
+import cv2
+import tflite_runtime.interpreter as tflite
 import numpy as np
 
-from pai.services import BaseStreamService
-from pai.utils import Resource, log
+from ..engine.base_service import BaseService
+from ..utils import Resource
 
-Object = collections.namedtuple('Object', ['id', 'score', 'bbox'])
-
-pil_logger = logging.getLogger('PIL')
-pil_logger.setLevel(logging.INFO)
-
+# library loading
 EDGETPU_SHARED_LIB = {
     'Linux': 'libedgetpu.so.1',
     'Darwin': 'libedgetpu.1.dylib',
     'Windows': 'edgetpu.dll'
 }[platform.system()]
+
+# Structure to hold objects
+Object = collections.namedtuple('Object', ['id', 'score', 'bbox'])
 
 
 class BBox(collections.namedtuple('BBox', ['xmin', 'ymin', 'xmax', 'ymax'])):
@@ -185,88 +177,117 @@ def load_labels(path, encoding='utf-8'):
             return {}
 
         if lines[0].split(' ', maxsplit=1)[0].isdigit():
-            pairs = [line.split(' ', maxsplit=1) for line in lines]
-            return {int(index): label.strip() for index, label in pairs}
+            eyesightrs = [line.split(' ', maxsplit=1) for line in lines]
+            return {int(index): label.strip() for index, label in eyesightrs}
         else:
             return {index: line.strip() for index, line in enumerate(lines)}
 
 
 def make_interpreter(model_file):
     model_file, *device = model_file.split('@')
-    return tflite.Interpreter(
-            model_path=model_file,
-            experimental_delegates=[
-                tflite.load_delegate(EDGETPU_SHARED_LIB,
-                                     {'device': device[0]} if device else {})
-            ])
+    try:
+        interpreter = tflite.Interpreter(
+                model_path=model_file,
+                experimental_delegates=[
+                    tflite.load_delegate(
+                        EDGETPU_SHARED_LIB,
+                        {'device': device[0]} if device else {})
+                ])
+    except ValueError:
+        interpreter = tflite.Interpreter(model_path=model_file)
+    return interpreter
 
 
-def draw_objects(draw, objs, labels):
+def text_over(img,
+              text,
+              bottomleft,
+              tx_color=(0, 0, 0),
+              bg_color=(0, 255, 0),
+              thickness=1,
+              padding=(5, 5),
+              font_scale=0.6,
+              font=cv2.FONT_HERSHEY_DUPLEX):
+
+    (tw, th), baseline = cv2.getTextSize(
+        text, font, fontScale=font_scale, thickness=thickness)
+
+    ymax = min(max(bottomleft[1], th + 2 * padding[1]), img.shape[0])
+    xmin = max(min(bottomleft[0], img.shape[1] - tw - 2 * padding[0]), 0)
+    box_coords = (
+            (xmin, ymax),
+            (xmin + tw + 2 * padding[0], ymax - th - 2 * padding[1]))
+    cv2.rectangle(img, box_coords[0], box_coords[1], bg_color, cv2.FILLED)
+    cv2.putText(img, text, (xmin + padding[0], ymax - padding[1]),
+                font, fontScale=font_scale,
+                color=tx_color, thickness=thickness, lineType=cv2.LINE_AA)
+
+
+def draw_objects(img, objs, labels):
     """Draws the bounding box and label for each object."""
     for obj in objs:
         bbox = obj.bbox
-        draw.rectangle([(bbox.xmin, bbox.ymin), (bbox.xmax, bbox.ymax)],
-                       outline='red')
-        draw.text((bbox.xmin + 10, bbox.ymin + 10),
-                  '%s\n%.2f' % (labels.get(obj.id, obj.id), obj.score),
-                  fill='red')
+        cv2.rectangle(img, (bbox.xmin, bbox.ymin), (bbox.xmax, bbox.ymax),
+                      (0, 255, 0), 2)
+        text_over(img,
+                  '{:s} ({:.1f}%)'.format(
+                      labels.get(obj.id, obj.id), obj.score * 100),
+                  (bbox.xmin, bbox.ymin))
 
 
-class ObjectDetector(BaseStreamService):
-    camlock = threading.Lock()
-    camera = None
+class ObjectDetector(BaseService):
+    """Object deteciton service, based on MobileNet V2 SSD Coco
+    """
+
+    # The neural network should be loaded only once
     interpreter = None
+    labels = None
 
-    def __init__(self, camera):
-        """Neural network should be attached to a camera
-
-        TODO: fix this requirement
-        """
-        ObjectDetector.set_camera(camera)
-        super().__init__()
-
-    @classmethod
-    def set_camera(cls, camera):
-        cls.camlock.acquire()
-        cls.camera = camera
-        cls.camlock.release()
-        log.info('Camera is set to {}'.format(
-            '.'.join([type(camera).__module__, type(camera).__name__])))
+    def __init__(self,
+                 camera,
+                 inactivity_timeout=10,
+                 client_timeout=5):
+        super().__init__(
+                input_services={'camera': camera},
+                inactivity_timeout=inactivity_timeout,
+                client_timeout=inactivity_timeout)
 
     @staticmethod
-    def frames():
+    def load_model():
         model_path = Resource(
                 collection_name='mobilenet_ssd_v2_coco',
-                url='https://github.com/google-coral/' \
-                    'edgetpu/raw/master/test_data/' \
+                url='https://github.com/google-coral/'
+                    'edgetpu/raw/master/test_data/'
                     'mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite'
         ).path()
+        ObjectDetector.interpreter = make_interpreter(model_path)
+        ObjectDetector.interpreter.allocate_tensors()
+
+    @staticmethod
+    def load_labels():
         labels_path = Resource(
                 collection_name='mobilenet_ssd_v2_coco',
                 url='https://dl.google.com/coral/canned_models/coco_labels.txt'
         ).path()
+        ObjectDetector.labels = load_labels(labels_path)
 
-        labels = load_labels(labels_path)
-        interpreter = make_interpreter(model_path)
-        interpreter.allocate_tensors()
+    def _generator(self):
+        if ObjectDetector.interpreter is None:
+            ObjectDetector.load_model()
+        if ObjectDetector.labels is None:
+            ObjectDetector.load_labels()
 
         while True:
-            # throw, otherwise we will be locked forever
-            if ObjectDetector.camera is None:
-                raise RuntimeError(
-                        'Neural Network should be attached to a camera')
-
             # image preprocess
-            image = cv2.cvtColor(
-                    ObjectDetector.camera.get_frame()[1], cv2.COLOR_BGR2RGB)
-            scale = set_input(interpreter, (image.shape[1], image.shape[0]),
-                              lambda size: cv2.resize(image, size))
+            image = self._get_input('camera')
+            scale = set_input(
+                    ObjectDetector.interpreter,
+                    (image.shape[1], image.shape[0]),
+                    lambda size: cv2.resize(image, size))
 
             # inference
-            interpreter.invoke()
-            objs = get_output(interpreter, 0.4, scale)
+            ObjectDetector.interpreter.invoke()
+            objs = get_output(ObjectDetector.interpreter, 0.4, scale)
 
             # output
-            image = Image.fromarray(image).convert('RGB')
-            draw_objects(ImageDraw.Draw(image), objs, labels)
-            yield np.array(image)
+            draw_objects(image, objs, ObjectDetector.labels)
+            yield image
