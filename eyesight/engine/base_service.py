@@ -4,7 +4,7 @@ from abc import ABCMeta, abstractmethod
 
 from readerwriterlock import rwlock
 from eyesight.utils import log
-from eyesight.utils import caller_class_name, class_name
+from eyesight.utils import class_name
 
 
 class ClientEventHandler:
@@ -57,9 +57,9 @@ class ClientEventHandler:
 class HistoryItem:
     """History of each package when it's processed by a service.
     """
-    def __init__(self):
-        self.timestamp = time.time()
-        self.invoker = caller_class_name()
+    def __init__(self, timestamp, invoker):
+        self.timestamp = timestamp
+        self.invoker = invoker
 
     def __str__(self):
         return 'HistoryItem({}, {})'.format(str(self.timestamp), self.invoker)
@@ -143,8 +143,10 @@ class BaseService(metaclass=ABCMeta):
         """
         frames_iterator = self._generator()
         for frame in frames_iterator:
+            now = time.time()
             with self._lock.gen_wlock():
-                self._history = self._history_tape + [HistoryItem()]
+                self._history = self._history_tape + [HistoryItem(
+                    now, class_name(self))]
                 self._frame = frame
 
             self._event_handler.set()

@@ -5,6 +5,7 @@ from flask import Flask, render_template, Response
 import cv2
 
 from eyesight.services import ObjectDetector
+from eyesight.services import PerformanceBar
 if 'CAMERA' in os.environ:
     if os.environ['CAMERA'] == 'pi':
         from eyesight.services import PiCamera as Camera
@@ -17,7 +18,7 @@ else:
 
 
 app = Flask(__name__)
-service = ObjectDetector(Camera())
+service = PerformanceBar(ObjectDetector(Camera()))
 service.start()
 
 

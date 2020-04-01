@@ -231,7 +231,7 @@ def draw_objects(img, objs, labels):
         text_over(img,
                   '{:s} ({:.1f}%)'.format(
                       labels.get(obj.id, obj.id), obj.score * 100),
-                  (bbox.xmin, bbox.ymin))
+                  (bbox.xmin - 1, bbox.ymin - 1))
 
 
 class ObjectDetector(BaseService):
@@ -242,14 +242,8 @@ class ObjectDetector(BaseService):
     interpreter = None
     labels = None
 
-    def __init__(self,
-                 camera,
-                 inactivity_timeout=10,
-                 client_timeout=5):
-        super().__init__(
-                input_services={'camera': camera},
-                inactivity_timeout=inactivity_timeout,
-                client_timeout=inactivity_timeout)
+    def __init__(self, camera, **kwargs):
+        super().__init__(input_services={'camera': camera}, **kwargs)
 
     @staticmethod
     def load_model():

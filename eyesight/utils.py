@@ -1,7 +1,5 @@
-import threading
 import colorlog
 import logging
-import pathlib
 import inspect
 import shutil
 import wget
