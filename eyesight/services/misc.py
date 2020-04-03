@@ -7,6 +7,15 @@ from ..engine.base_service import BaseService
 from ..utils import log
 
 
+class EmptyService(BaseService):
+    def __init__(self, service, *args, **kwargs):
+        super().__init__(input_services=[service], *args, **kwargs)
+
+    def _generator(self):
+        while True:
+            yield self._get_inputs(0)
+
+
 class PerformanceBar(BaseService):
     """Writes performance statistics info on a bar on top of received image.
 
@@ -23,9 +32,12 @@ class PerformanceBar(BaseService):
     """
     BacklogItem = namedtuple('BacklogItem', 'timestamp delay')
 
-    def __init__(self, service, n_frames=0, **kwargs):
+    def __init__(self, service, n_frames=0, *args, **kwargs):
         self.n_frames = n_frames
-        super().__init__(input_services={'service': service}, **kwargs)
+        super().__init__(
+                input_services={'service': service},
+                adapter_type='simple',
+                *args, **kwargs)
 
     def _generator(self):
         total_delay = 0.
@@ -36,9 +48,9 @@ class PerformanceBar(BaseService):
             performance_log = deque()
 
         while True:
-            # After `_get_input`, we will have a full history tape of this
+            # After `_get_inputs`, we will have a full history tape of this
             # package for analyze (the last entry will be this class).
-            image = self._get_input('service').copy()
+            image = self._get_inputs('service')['service']
             assert isinstance(image, np.ndarray) and len(image.shape) == 3 \
                 and image.shape[2] == 3 and image.dtype == np.uint8
 

@@ -12,6 +12,8 @@ if 'CAMERA' in os.environ:
         from eyesight.services import CVCamera as Camera
     elif os.environ['CAMERA'] == 'img':
         from eyesight.services import ImageCamera as Camera
+    elif os.environ['CAMERA'] == 'empty':
+        from eyesight.services import EmptyCamera as Camera
     else:
         raise RuntimeError('Unknown CAMERA specified.')
 else:
@@ -20,10 +22,12 @@ else:
 if 'SERVICE' in os.environ:
     if os.environ['SERVICE'] == 'det':
         from eyesight.services import ObjectDetector as Service
+    elif os.environ['SERVICE'] == 'sem':
+        from eyesight.services import SemanticSegmentator as Service
     else:
         raise RuntimeError('Unknown SERVICE specified.')
 else:
-    def Service(x): return x
+    from eyesight.services import EmptyService as Service
 
 
 stream = Service(Camera())

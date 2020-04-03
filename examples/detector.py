@@ -26,7 +26,7 @@ if 'SERVICE' in os.environ:
     else:
         raise RuntimeError('Unknown SERVICE specified.')
 else:
-    def Service(x): return x
+    from eyesight.services import EmptyService as Service
 
 
 app = Flask(__name__)

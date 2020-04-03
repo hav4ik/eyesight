@@ -1,10 +1,12 @@
 import time
 import threading
+from copy import deepcopy
 from abc import ABCMeta, abstractmethod
 
 from readerwriterlock import rwlock
-from eyesight.utils import log
-from eyesight.utils import class_name
+from ..utils import log
+from ..utils import class_name
+from .adapters import get as get_adapter
 
 
 class ClientEventHandler:
@@ -73,20 +75,18 @@ class BaseService(metaclass=ABCMeta):
             have been started.
     """
     def __init__(self,
-                 input_services=[],
+                 input_services=dict(),
+                 adapter_type='simple',
                  inactivity_timeout=10,
                  client_timeout=5):
+
         self._thread = None
         self._frame = None
         self._history = []
         self._history_tape = []
         self._is_stopped = False
 
-        if isinstance(input_services, list):
-            self._input_services = dict(enumerate(input_services))
-        if isinstance(input_services, dict):
-            self._input_services = input_services
-
+        self._input_adapter = get_adapter(adapter_type)(input_services)
         self._inactivity_timeout = inactivity_timeout
         self._last_access = 0
         self._lock = rwlock.RWLockFair()
@@ -99,8 +99,10 @@ class BaseService(metaclass=ABCMeta):
         wait until frames are available.
         """
         # Start threads of dependencies if they're not already started
-        for _, service in self._input_services.items():
-            service.start()
+        if self._input_adapter is not None:
+            if self._input_adapter._input_services is not None:
+                for _, service in self._input_adapter._input_services.items():
+                    service.start()
 
         if self._thread is None:
             begin = time.time()
@@ -130,13 +132,7 @@ class BaseService(metaclass=ABCMeta):
                             class_name(self), self._inactivity_timeout))
         self._event_handler.clear()
         with self._lock.gen_rlock():
-            return self._history, self._frame
-
-    @abstractmethod
-    def _generator(self):
-        """Coroutine generator that yields packages, put in separate thread
-        """
-        pass
+            return deepcopy(self._history), deepcopy(self._frame)
 
     def _update(self):
         """Background thread loop
@@ -163,7 +159,16 @@ class BaseService(metaclass=ABCMeta):
                 break
         self._thread = None
 
-    def _get_input(self, input_id):
-        history, frame = self._input_services[input_id].query()
-        self._history_tape.extend(history)
-        return frame
+    def _get_inputs(self, input_ids):
+        inputs = dict()
+        for input_id, (history, frame) in \
+                self._input_adapter.get_inputs(input_ids).items():
+            self._history_tape.extend(history)
+            inputs[input_id] = frame
+        return inputs
+
+    @abstractmethod
+    def _generator(self):
+        """Coroutine generator that yields packages, put in separate thread
+        """
+        pass

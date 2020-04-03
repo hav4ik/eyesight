@@ -242,8 +242,11 @@ class ObjectDetector(BaseService):
     interpreter = None
     labels = None
 
-    def __init__(self, camera, **kwargs):
-        super().__init__(input_services={'camera': camera}, **kwargs)
+    def __init__(self, camera, *args, **kwargs):
+        super().__init__(
+                input_services={'cam': camera},
+                adapter_type='simple',
+                *args, **kwargs)
 
     @staticmethod
     def load_model():
@@ -272,7 +275,7 @@ class ObjectDetector(BaseService):
 
         while True:
             # image preprocess
-            image = self._get_input('camera')
+            image = self._get_inputs('cam')['cam']
             scale = set_input(
                     ObjectDetector.interpreter,
                     (image.shape[1], image.shape[0]),

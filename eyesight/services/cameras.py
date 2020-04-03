@@ -1,7 +1,10 @@
 import os
 import time
 import numpy as np
-from eyesight import BaseService
+
+from ..engine.base_service import BaseService
+from ..utils import Resource
+
 
 # If we can import picamera, i.e. we are on a Raspberry Pi
 PLATFORM_RPI = True
@@ -35,9 +38,15 @@ class EmptyCamera(BaseService):
 class ImageCamera(BaseService):
     """To test computer vision algorithms
     """
-    def __init__(self, images, *args, **kwargs):
+    def __init__(self, images=None, size=(640, 480), *args, **kwargs):
         if not HAS_OPENCV:
             raise NotImplementedError('OpenCV required')
+        if images is None:
+            images = [Resource(
+                collection_name='test_images',
+                url='https://photolemur.com/uploads/blog/'
+                    'thierry-ambraisse-200857.jpg').path()]
+        self.size = size
 
         self.images = []
         if isinstance(images, str):
@@ -52,8 +61,8 @@ class ImageCamera(BaseService):
     def _generator(self):
         while True:
             for path in self.images:
-                img = cv2.cvtColor(cv2.imread(path), cv2.COLOR_BGR2RGB)
-                yield img
+                img = cv2.resize(cv2.imread(path), self.size)
+                yield cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
     @staticmethod
     def _get_image_or_imdir(path):
