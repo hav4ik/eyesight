@@ -1,57 +1,15 @@
-import platform
-
 import cv2
-import tflite_runtime.interpreter as tflite
 import numpy as np
 
 from ..engine.base_service import BaseService
-from ..utils import Resource
+from ..utils.generic_utils import Resource
+from ..utils.output_utils import label_to_color_image
+from ..utils import backend_utils as backend
 
-# library loading
-EDGETPU_SHARED_LIB = {
-    'Linux': 'libedgetpu.so.1',
-    'Darwin': 'libedgetpu.1.dylib',
-    'Windows': 'edgetpu.dll'
-}[platform.system()]
-
-
-def create_pascal_label_colormap():
-    """Creates a label colormap used in PASCAL VOC segmentation benchmark.
-    Returns:
-        A Colormap for visualizing segmentation results.
-    """
-    colormap = np.zeros((256, 3), dtype=int)
-    indices = np.arange(256, dtype=int)
-
-    for shift in reversed(range(8)):
-        for channel in range(3):
-            colormap[:, channel] |= ((indices >> channel) & 1) << shift
-        indices >>= 3
-
-    return colormap
-
-
-def label_to_color_image(label):
-    """Adds color defined by the dataset colormap to the label.
-    Args:
-        label: A 2D array with integer type, storing the segmentation label.
-    Returns:
-        result: A 2D array with floating type. The element of the array
-            is the color indexed by the corresponding element in the input
-            label to the PASCAL color map.
-    Raises:
-        ValueError: If label is not of rank 2 or its value is larger than color
-            map maximum entry.
-    """
-    if label.ndim != 2:
-        raise ValueError('Expect 2-D input label')
-
-    colormap = create_pascal_label_colormap()
-
-    if np.max(label) >= len(colormap):
-        raise ValueError('label value too large.')
-
-    return colormap[label]
+if backend._USING_TENSORFLOW_TFLITE:
+    import tensorflow.lite as tflite
+elif backend._USING_TFLITE_RUNTIME:
+    import tflite_runtime.interpreter as tflite
 
 
 def set_input(interpreter, size, resize):
@@ -84,7 +42,7 @@ def make_interpreter(model_file):
                 model_path=model_file,
                 experimental_delegates=[
                     tflite.load_delegate(
-                        EDGETPU_SHARED_LIB,
+                        backend._EDGETPU_SHARED_LIB,
                         {'device': device[0]} if device else {})
                 ])
     except ValueError:

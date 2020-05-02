@@ -3,7 +3,7 @@ import datetime
 import os
 
 from imutils.video import FPS
-from eyesight.utils import log
+from eyesight.utils.generic_utils import log
 
 if 'CAMERA' in os.environ:
     if os.environ['CAMERA'] == 'pi':

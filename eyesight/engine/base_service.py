@@ -4,8 +4,8 @@ from copy import deepcopy
 from abc import ABCMeta, abstractmethod
 
 from readerwriterlock import rwlock
-from ..utils import log
-from ..utils import class_name
+from ..utils.generic_utils import log
+from ..utils.generic_utils import class_name
 from .adapters import get as get_adapter
 
 

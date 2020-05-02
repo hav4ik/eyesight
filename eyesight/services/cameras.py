@@ -3,23 +3,13 @@ import time
 import numpy as np
 
 from ..engine.base_service import BaseService
-from ..utils import Resource
+from ..utils.generic_utils import Resource
+from ..utils import backend_utils as backend
 
-
-# If we can import picamera, i.e. we are on a Raspberry Pi
-PLATFORM_RPI = True
-try:
+import cv2
+if backend._USING_RASPBERRYPI_CAMERA:
     import picamera
     import picamera.array
-except ImportError:
-    PLATFORM_RPI = False
-
-# If OpenCV is available in current system
-HAS_OPENCV = True
-try:
-    import cv2
-except ImportError:
-    HAS_OPENCV = False
 
 
 class EmptyCamera(BaseService):
@@ -39,8 +29,6 @@ class ImageCamera(BaseService):
     """To test computer vision algorithms
     """
     def __init__(self, images=None, size=(640, 480), *args, **kwargs):
-        if not HAS_OPENCV:
-            raise NotImplementedError('OpenCV required')
         if images is None:
             images = [Resource(
                 collection_name='test_images',
@@ -85,8 +73,12 @@ class PiCamera(BaseService):
                  *args,
                  **kwargs):
 
-        if not PLATFORM_RPI:
-            raise NotImplementedError('Only available for Raspberry Pi')
+        if not backend._USING_RASPBERRYPI_CAMERA:
+            raise NotImplementedError(
+                    'Only available for Raspberry Pi - missing '
+                    '`picamera` module. Install it with `pip install '
+                    'picamera` and make sure you have a PiCamera '
+                    'attached.')
 
         self.resolution = resolution
         self.framerate = framerate
@@ -114,9 +106,6 @@ class CVCamera(BaseService):
     """WebCam service"""
 
     def __init__(self, video_source=0, *args, **kwargs):
-        if not HAS_OPENCV:
-            raise NotImplementedError('OpenCV required')
-
         if os.environ.get('OPENCV_CAMERA_SOURCE'):
             CVCamera.video_source = \
                     int(os.environ['OPENCV_CAMERA_SOURCE'])

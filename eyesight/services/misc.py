@@ -4,10 +4,14 @@ import numpy as np
 import cv2
 
 from ..engine.base_service import BaseService
-from ..utils import log
+from ..utils.generic_utils import log
 
 
 class EmptyService(BaseService):
+    """
+    A service that does nothing and just passes the first input through
+    itself. Used for testing other modules and services.
+    """
     def __init__(self, service, *args, **kwargs):
         super().__init__(input_services=[service], *args, **kwargs)
 
@@ -32,7 +36,7 @@ class PerformanceBar(BaseService):
     """
     BacklogItem = namedtuple('BacklogItem', 'timestamp delay')
 
-    def __init__(self, service, n_frames=0, *args, **kwargs):
+    def __init__(self, service, n_frames=200, *args, **kwargs):
         self.n_frames = n_frames
         super().__init__(
                 input_services={'service': service},
