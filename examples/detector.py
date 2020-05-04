@@ -5,6 +5,7 @@ from flask import Flask, render_template, Response
 import cv2
 
 from eyesight.services import PerformanceBar
+from eyesight import ServiceManager
 
 if 'CAMERA' in os.environ:
     if os.environ['CAMERA'] == 'pi':
@@ -31,7 +32,8 @@ else:
 
 app = Flask(__name__)
 service = PerformanceBar(Service(Camera()))
-service.start()
+manager = ServiceManager(service)
+manager.start()
 
 
 @app.route('/')

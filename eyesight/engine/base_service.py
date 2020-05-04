@@ -85,6 +85,7 @@ class BaseService(metaclass=ABCMeta):
         self._history = []
         self._history_tape = []
         self._is_stopped = False
+        self._manager = None
 
         self._input_adapter = get_adapter(adapter_type)(input_services)
         self._inactivity_timeout = inactivity_timeout
@@ -112,7 +113,7 @@ class BaseService(metaclass=ABCMeta):
             self._is_stopped = False
             while self.query()[1] is None:
                 time.sleep(0.01)
-            log.info('<{:s}> initialized in {:.6f} seconds.'.format(
+            log.debug('<{:s}> initialized in {:.6f} seconds.'.format(
                     class_name(self), time.time() - begin))
 
     def stop(self):
@@ -151,11 +152,14 @@ class BaseService(metaclass=ABCMeta):
             if time.time() - self._last_access > self._inactivity_timeout:
                 frames_iterator.close()
                 log.warning(
-                        'Stopping {} due to inactivity for 10 seconds.'
+                        'Stopping <{:s}> due to inactivity for 10 seconds.'
                         .format(class_name(self)))
                 break
 
             if self._is_stopped:
+                log.debug(
+                        '<{:s}> received stop signal.'
+                        .format(class_name(self)))
                 break
         self._thread = None
 
@@ -167,8 +171,16 @@ class BaseService(metaclass=ABCMeta):
             inputs[input_id] = frame
         return inputs
 
+    @property
+    def manager(self):
+        return self._manager
+
+    @manager.setter
+    def manager(self, value):
+        self._manager = value
+
     @abstractmethod
     def _generator(self):
         """Coroutine generator that yields packages, put in separate thread
         """
-        pass
+        NotImplemented

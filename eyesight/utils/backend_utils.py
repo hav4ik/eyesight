@@ -14,7 +14,7 @@ _eyesight_dir = os.path.join(_eyesight_base_dir, '.eyesight')
 _eyesight_dir = os.environ.get('EYESIGHT_HOME', _eyesight_dir)
 if not os.path.isdir(_eyesight_dir):
     os.makedirs(_eyesight_dir)
-log.info('[Init] Eyesight dir: {}'.format(_eyesight_dir))
+log.debug('[Init] Eyesight dir: {}'.format(_eyesight_dir))
 
 # Default neural network inference backend: TF-Lite
 _backend = 'tflite'
@@ -40,7 +40,7 @@ if os.path.exists(_config_path):
     _backend = _config.get('backend', _backend)
 else:
     _backend = os.environ.get('EYESIGHT_BACKEND', _backend)
-log.info('[Init] Backend is set to {}'.format(_backend))
+log.debug('[Init] Backend is set to {}'.format(_backend))
 
 # If successfully imported, one can use it as `backend.tflite`.
 if _backend == 'tflite':
@@ -49,12 +49,12 @@ if _backend == 'tflite':
     try:
         import tflite_runtime.interpreter as tflite
         _USING_TFLITE_RUNTIME = True
-        log.info('[Init] Using `tflite` from `tflite_runtime`.')
+        log.debug('[Init] Using `tflite` from `tflite_runtime`.')
     except ImportError:
         try:
             import tensorflow.lite as tflite
             _USING_TENSORFLOW_TFLITE = True
-            log.info('[Init] Using `tflite` from `tensorflow`.')
+            log.debug('[Init] Using `tflite` from `tensorflow`.')
         except ImportError as e:
             raise ImportError(
                 'Backend "tflite" not found. Please make sure that either'
@@ -69,7 +69,7 @@ if _backend == 'tflite':
     try:
         tflite.load_delegate(_EDGETPU_SHARED_LIB)
         _USING_EDGE_TPU = True
-        log.info('[Init] Using Google Coral Edge TPU.')
+        log.debug('[Init] Using Google Coral Edge TPU.')
     except (ValueError, RuntimeError):
         _EDGETPU_SHARED_LIB = None
 
@@ -79,7 +79,7 @@ else:
 # If we can import picamera, i.e. we are on a Raspberry Pi
 try:
     import picamera
-    log.info('[Init] Found picamera module.')
+    log.debug('[Init] Found picamera module.')
     _USING_RASPBERRYPI_CAMERA = True
 except ImportError:
     _USING_RASPBERRYPI_CAMERA = False

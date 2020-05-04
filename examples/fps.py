@@ -4,6 +4,7 @@ import os
 
 from imutils.video import FPS
 from eyesight.utils.generic_utils import log
+from eyesight import ServiceManager
 
 if 'CAMERA' in os.environ:
     if os.environ['CAMERA'] == 'pi':
@@ -31,7 +32,8 @@ else:
 
 
 stream = Service(Camera())
-stream.start()
+manager = ServiceManager(stream)
+manager.start()
 log.info('Start measuring')
 
 fps = FPS().start()
@@ -42,6 +44,9 @@ while fps._numFrames < 200 and \
     delta += time.time() - history[0].timestamp
     fps.update()
 fps.stop()
+
+log.info('Stopped measuring')
+manager.stop()
 delta /= fps._numFrames
 
 log.info('Elapsed time: {:.2f}'.format(fps.elapsed()))

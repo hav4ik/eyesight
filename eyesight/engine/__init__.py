@@ -1,3 +1,4 @@
+from .service_manager import ServiceManager
 from .base_service import BaseService
 
 from .adapters import BaseInputAdapter
