@@ -18,7 +18,7 @@ if 'CAMERA' in os.environ:
     else:
         raise RuntimeError('Unknown CAMERA specified.')
 else:
-    from eyesight.services import DefaultCamera as Camera
+    from eyesight.services import EmptyCamera as Camera
 
 if 'SERVICE' in os.environ:
     if os.environ['SERVICE'] == 'det':

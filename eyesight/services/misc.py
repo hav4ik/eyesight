@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 
 from ..engine.base_service import BaseService
+from ..engine.adapters import get as get_adapter
 from ..utils.generic_utils import log
 
 
@@ -13,7 +14,9 @@ class EmptyService(BaseService):
     itself. Used for testing other modules and services.
     """
     def __init__(self, service, *args, **kwargs):
-        super().__init__(input_services=[service], *args, **kwargs)
+        super().__init__(
+                adapter=get_adapter('simple')([service]),
+                *args, **kwargs)
 
     def _generator(self):
         while True:
@@ -39,8 +42,7 @@ class PerformanceBar(BaseService):
     def __init__(self, service, n_frames=200, *args, **kwargs):
         self.n_frames = n_frames
         super().__init__(
-                input_services={'service': service},
-                adapter_type='simple',
+                adapter=get_adapter('simple')({'service': service}),
                 *args, **kwargs)
 
     def _generator(self):
@@ -54,7 +56,7 @@ class PerformanceBar(BaseService):
         while True:
             # After `_get_inputs`, we will have a full history tape of this
             # package for analyze (the last entry will be this class).
-            image = self._get_inputs('service')['service']
+            image = self._get_inputs('service')
             assert isinstance(image, np.ndarray) and len(image.shape) == 3 \
                 and image.shape[2] == 3 and image.dtype == np.uint8
 

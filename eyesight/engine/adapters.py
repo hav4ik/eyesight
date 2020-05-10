@@ -3,6 +3,7 @@ from copy import deepcopy
 from collections import deque
 import asyncio
 import time
+from ..utils.generic_utils import log
 
 
 class BaseInputAdapter(metaclass=ABCMeta):
@@ -21,9 +22,34 @@ class BaseInputAdapter(metaclass=ABCMeta):
             raise ValueError(
                     '`input_services` should either be a dict or a list')
 
+    def get_inputs(self, *input_ids):
+        """Given input ids, return a tuple of service outputs in same order
+        """
+        if len(input_ids) == 0:
+            return None
+
+        existing_ids = [
+                sid for sid in input_ids if sid in self._input_services]
+
+        if len(existing_ids) < len(input_ids):
+            non_existing_ids = list(set(input_ids).difference(existing_ids))
+            log.error(
+                    'Requested for non-existing input service keys: {}.'
+                    .format(', '.join(str(sid) for sid in non_existing_ids)))
+
+        if len(existing_ids) == 0:
+            return tuple(None for _ in input_ids)
+
+        output_dict = self._get_inputs_internal(*existing_ids)
+        ret = tuple(
+                output_dict[sid] if sid in output_dict else None
+                for sid in input_ids)
+
+        return ret[0] if len(ret) == 1 else ret
+
     @abstractmethod
-    def get_inputs(self, input_ids):
-        """Retrieve a list of outputs
+    def _get_inputs_internal(self, *input_ids):
+        """Retrieve a list of outputs and returns a dict {input_id: value}
         """
         return NotImplemented
 
@@ -38,7 +64,7 @@ class SimpleAdapter(BaseInputAdapter):
     def __init__(self, input_services):
         super().__init__(input_services)
 
-    def get_inputs(self, *input_ids):
+    def _get_inputs_internal(self, *input_ids):
         return dict((input_id, self._input_services[input_id].query())
                     for input_id in input_ids)
 
@@ -69,7 +95,7 @@ class LatestAdapter(BaseInputAdapter):
                     self._input_services[input_id].query()
             yield self._saved_outputs[input_id]
 
-    async def get_inputs(self, *input_ids):
+    async def _get_inputs_internal(self, *input_ids):
         await asyncio.wait(self._coroutines[self._coroutine_ids[input_ids]],
                            return_when=asyncio.FIRST_COMPLETED)
         with self._lock:
@@ -106,7 +132,7 @@ class SyncAdapter(BaseInputAdapter):
                 self._cache[input_id].append(last)
             yield last
 
-    async def get_inputs(self, *input_ids):
+    async def _get_inputs_internal(self, *input_ids):
         await asyncio.wait(self._coroutines[self._coroutine_ids[input_ids]],
                            return_when=asyncio.FIRST_COMPLETED)
         ret = dict()
@@ -139,7 +165,7 @@ class MultiAdapter(BaseInputAdapter):
         self._adapters = input_adapters
         super().__init__(services)
 
-    def get_inputs(self, *input_ids):
+    def _get_inputs_internal(self, *input_ids):
         ret_dict = dict()
         for adapter in self._input_adapters:
             sub_input_ids = list(set(input_ids).union(
@@ -156,6 +182,8 @@ def get(identifier):
             return SimpleAdapter
         elif identifier == 'latest':
             return LatestAdapter
+        elif identifier == 'sync':
+            return SyncAdapter
     elif isinstance(identifier, BaseInputAdapter):
         return identifier
     else:

@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 
 from ..engine.base_service import BaseService
+from ..engine.adapters import get as get_adapter
 from ..utils.generic_utils import Resource
 from ..utils.output_utils import label_to_color_image
 from ..utils import backend_utils as backend
@@ -73,8 +74,7 @@ class SemanticSegmentator(BaseService):
 
     def __init__(self, camera, *args, **kwargs):
         super().__init__(
-                input_services={'cam': camera},
-                adapter_type='simple',
+                adapter=get_adapter('simple')({'cam': camera}),
                 *args, **kwargs)
 
     @staticmethod
@@ -93,7 +93,7 @@ class SemanticSegmentator(BaseService):
             SemanticSegmentator.load_model()
 
         while True:
-            image = self._get_inputs('cam')['cam']
+            image = self._get_inputs('cam')
             scale, img = set_input(
                     SemanticSegmentator.interpreter,
                     (image.shape[1], image.shape[0]),

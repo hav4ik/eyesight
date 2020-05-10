@@ -4,7 +4,8 @@ import collections
 
 
 # Structure to hold objects
-Object = collections.namedtuple('Object', ['id', 'score', 'bbox'])
+DetectionObject = collections.namedtuple(
+        'DetectionObject', ['id', 'score', 'bbox'])
 
 
 class BBox(collections.namedtuple('BBox', ['xmin', 'ymin', 'xmax', 'ymax'])):

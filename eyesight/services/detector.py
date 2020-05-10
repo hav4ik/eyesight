@@ -2,8 +2,9 @@ import cv2
 import numpy as np
 
 from ..engine.base_service import BaseService
+from ..engine.adapters import get as get_adapter
 from ..utils.generic_utils import Resource
-from ..utils.output_utils import BBox, Object, draw_objects
+from ..utils.output_utils import BBox, DetectionObject, draw_objects
 from ..utils import backend_utils as backend
 
 if backend._USING_TENSORFLOW_TFLITE:
@@ -65,7 +66,7 @@ def get_output(interpreter, score_threshold, image_scale=(1.0, 1.0)):
 
     def make(i):
         ymin, xmin, ymax, xmax = boxes[i]
-        return Object(
+        return DetectionObject(
                 id=int(class_ids[i]),
                 score=float(scores[i]),
                 bbox=BBox(xmin=xmin,
@@ -132,48 +133,48 @@ class ObjectDetector(BaseService):
                     'libedgetpu for Coral Edge TPU not found. Make sure '
                     'that you have it installed.')
 
+        self.interpreter = None
+        self.labels = None
+
         super().__init__(
-                input_services={'cam': camera},
-                adapter_type='simple',
+                adapter=get_adapter('simple')({'cam': camera}),
                 *args, **kwargs)
 
-    @staticmethod
-    def load_model():
+    def load_model(self):
         model_path = Resource(
                 collection_name='mobilenet_ssd_v2_coco',
                 url='https://github.com/google-coral/'
                     'edgetpu/raw/master/test_data/'
                     'mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite'
         ).path()
-        ObjectDetector.interpreter = make_interpreter(model_path)
-        ObjectDetector.interpreter.allocate_tensors()
+        self.interpreter = make_interpreter(model_path)
+        self.interpreter.allocate_tensors()
 
-    @staticmethod
-    def load_labels():
+    def load_labels(self):
         labels_path = Resource(
                 collection_name='mobilenet_ssd_v2_coco',
                 url='https://dl.google.com/coral/canned_models/coco_labels.txt'
         ).path()
-        ObjectDetector.labels = load_labels(labels_path)
+        self.labels = load_labels(labels_path)
 
     def _generator(self):
-        if ObjectDetector.interpreter is None:
-            ObjectDetector.load_model()
-        if ObjectDetector.labels is None:
-            ObjectDetector.load_labels()
+        if self.interpreter is None:
+            self.load_model()
+        if self.labels is None:
+            self.load_labels()
 
         while True:
             # image preprocess
-            image = self._get_inputs('cam')['cam']
+            image = self._get_inputs('cam')
             scale = set_input(
-                    ObjectDetector.interpreter,
+                    self.interpreter,
                     (image.shape[1], image.shape[0]),
                     lambda size: cv2.resize(image, size))
 
             # inference
-            ObjectDetector.interpreter.invoke()
-            objs = get_output(ObjectDetector.interpreter, 0.4, scale)
+            self.interpreter.invoke()
+            objs = get_output(self.interpreter, 0.4, scale)
 
             # output
-            draw_objects(image, objs, ObjectDetector.labels)
+            draw_objects(image, objs, self.labels)
             yield image

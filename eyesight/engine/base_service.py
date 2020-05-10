@@ -75,8 +75,7 @@ class BaseService(metaclass=ABCMeta):
             have been started.
     """
     def __init__(self,
-                 input_services=dict(),
-                 adapter_type='simple',
+                 adapter=get_adapter('simple')(dict()),
                  inactivity_timeout=10,
                  client_timeout=5):
 
@@ -87,7 +86,7 @@ class BaseService(metaclass=ABCMeta):
         self._is_stopped = False
         self._manager = None
 
-        self._input_adapter = get_adapter(adapter_type)(input_services)
+        self._input_adapter = adapter
         self._inactivity_timeout = inactivity_timeout
         self._last_access = 0
         self._lock = rwlock.RWLockFair()
@@ -120,6 +119,11 @@ class BaseService(metaclass=ABCMeta):
         """Marks the thread as stopped so that _update makes a break.
         """
         self._is_stopped = True
+
+    def wait(self):
+        """Wait for the thread loop to finish
+        """
+        return self._thread.join()
 
     def query(self):
         """Wait till a new frame is available and return the current frame.
@@ -163,13 +167,31 @@ class BaseService(metaclass=ABCMeta):
                 break
         self._thread = None
 
-    def _get_inputs(self, input_ids):
-        inputs = dict()
-        for input_id, (history, frame) in \
-                self._input_adapter.get_inputs(input_ids).items():
-            self._history_tape.extend(history)
-            inputs[input_id] = frame
-        return inputs
+    def _get_inputs(self, *input_ids):
+        """Retrieves output value from the adapters
+        """
+        if len(input_ids) == 0:
+            return None
+
+        adapter_ret = self._input_adapter.get_inputs(*input_ids)
+        if len(input_ids) == 1:
+            adapter_ret = tuple((adapter_ret, ))
+        inputs = [frame for history, frame in adapter_ret]
+
+        # Need to deal with the history
+        for history, frame in adapter_ret:
+
+            # Always make sure that the history is sorted by timestamps
+            # and don't contain duplicates
+            self._history_tape.sort(key=lambda x: x.timestamp)
+            count_common = len(
+                    [x for x in zip(self._history_tape, history)
+                     if (x[0].timestamp == x[1].timestamp and
+                         x[0].invoker == x[1].invoker)])
+
+            self._history_tape.extend(history[count_common:])
+
+        return tuple(inputs) if len(inputs) > 1 else inputs[0]
 
     @property
     def manager(self):
