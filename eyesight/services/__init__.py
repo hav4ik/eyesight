@@ -13,3 +13,4 @@ from .segmentation import SemanticSegmentator
 # Convenience services
 from .misc import EmptyService
 from .misc import PerformanceBar
+from .misc import DetectronDraw

@@ -4,7 +4,7 @@ import os
 from flask import Flask, render_template, Response
 import cv2
 
-from eyesight.services import PerformanceBar
+from eyesight.services import PerformanceBar, DetectronDraw
 from eyesight import ServiceManager
 
 if 'CAMERA' in os.environ:
@@ -31,7 +31,20 @@ else:
 
 
 app = Flask(__name__)
-service = PerformanceBar(Service(Camera()))
+
+raspberry_cam = Camera()
+selected_service = Service(raspberry_cam)
+if 'SERVICE' in os.environ:
+    if os.environ['SERVICE'] == 'det':
+        output_drawer = DetectronDraw(
+                image_stream=raspberry_cam, detector=selected_service)
+    elif os.environ['SERVICE'] == 'sem':
+        output_drawer = DetectronDraw(
+                image_stream=raspberry_cam, segmentator=selected_service)
+else:
+    output_drawer = DetectronDraw(image_stream=raspberry_cam)
+
+service = PerformanceBar(output_drawer)
 manager = ServiceManager(service)
 manager.start()
 

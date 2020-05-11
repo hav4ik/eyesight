@@ -25,6 +25,8 @@ if 'SERVICE' in os.environ:
         from eyesight.services import ObjectDetector as Service
     elif os.environ['SERVICE'] == 'sem':
         from eyesight.services import SemanticSegmentator as Service
+    elif os.environ['SERVICE'] == 'draw':
+        from eyesight.services import DetectronDraw as Service
     else:
         raise RuntimeError('Unknown SERVICE specified.')
 else:

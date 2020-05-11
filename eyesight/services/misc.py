@@ -6,6 +6,8 @@ import cv2
 from ..engine.base_service import BaseService
 from ..engine.adapters import get as get_adapter
 from ..utils.generic_utils import log
+from ..utils.output_utils import draw_objects
+from ..utils.output_utils import label_to_color_image
 
 
 class EmptyService(BaseService):
@@ -125,3 +127,77 @@ class PerformanceBar(BaseService):
 
             # Return the image with status bar on top
             yield display_img
+
+
+class DetectronDraw(BaseService):
+    """
+    Aggregation and drawing of various vision services. Supported services
+    and required output formats:
+
+      - Object Detectors. Should output a tuple of two elements: a list of
+            `DetectionObject`, defined in `utils/output_utils.py`, and the
+            labels (a list of names for each id).
+      - Image Segmentators. Should output a color map together with labels
+            (a dict of names for each color).
+
+    # Arguments:
+        image_stream: the service that feeds images to all computer vision
+            services in the pipeline. Usually it's the camera service.
+        detector: (optional) object detection service, output format of it
+            should follow the format described above.
+        segmentator: (optional) semantic segmentation service, its output
+            format should follow the format described above.
+    """
+    def __init__(self,
+                 image_stream,
+                 detector=None,
+                 segmentator=None,
+                 tracker=None):
+
+        self._has_detector = False
+        self._has_segmentator = False
+        self._has_tracker = False
+        input_services = {'image_stream': image_stream}
+
+        if detector is not None:
+            self._has_detector = True
+            input_services['detector'] = detector
+
+        if segmentator is not None:
+            self._has_segmentator = True
+            input_services['segmentator'] = segmentator
+
+        if tracker is not None:
+            self._has_tracker = True
+            input_services['tracker'] = tracker
+
+        super().__init__(adapter=get_adapter('sync')(input_services))
+
+    def _generator(self):
+        while True:
+            image, detections, segmentation, tracking = self._get_inputs(
+                    'image_stream', 'detector', 'segmentator', 'tracker')
+
+            if image is None:
+                log.warning(
+                        '`image_stream` yielded None (expected behavior), '
+                        'continue.')
+                continue
+            assert isinstance(image, np.ndarray) and len(image.shape) == 3 \
+                and image.shape[2] == 3 and image.dtype == np.uint8
+
+            if self._has_segmentator and segmentation is not None:
+                assert isinstance(segmentation, np.ndarray) and \
+                    len(segmentation.shape) == 2
+
+                vis_res = label_to_color_image(
+                        segmentation.astype(np.int)).astype(np.uint8)
+                if vis_res.shape != image.shape:
+                    vis_res = cv2.resize(vis_res, image.shape)
+                image = 2 * (vis_res // 3) + image // 3
+
+            if self._has_detector and detections is not None:
+                objects, labels = detections
+                draw_objects(image, objects, labels)
+
+            yield image

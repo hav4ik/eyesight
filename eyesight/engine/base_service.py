@@ -104,6 +104,10 @@ class BaseService(metaclass=ABCMeta):
                 for _, service in self._input_adapter._input_services.items():
                     service.start()
 
+        # Start the adapter
+        self._input_adapter.start()
+
+        # Start the service thread
         if self._thread is None:
             begin = time.time()
             self._last_access = time.time()
@@ -115,15 +119,13 @@ class BaseService(metaclass=ABCMeta):
             log.debug('<{:s}> initialized in {:.6f} seconds.'.format(
                     class_name(self), time.time() - begin))
 
-    def stop(self):
+    def stop(self, wait=False):
         """Marks the thread as stopped so that _update makes a break.
         """
         self._is_stopped = True
-
-    def wait(self):
-        """Wait for the thread loop to finish
-        """
-        return self._thread.join()
+        if wait and self._thread is not None:
+            self._thread.join()
+        self._input_adapter.stop(wait)
 
     def query(self):
         """Wait till a new frame is available and return the current frame.

@@ -4,7 +4,7 @@ import numpy as np
 from ..engine.base_service import BaseService
 from ..engine.adapters import get as get_adapter
 from ..utils.generic_utils import Resource
-from ..utils.output_utils import BBox, DetectionObject, draw_objects
+from ..utils.output_utils import BBox, DetectionObject
 from ..utils import backend_utils as backend
 
 if backend._USING_TENSORFLOW_TFLITE:
@@ -116,11 +116,6 @@ def make_interpreter(model_file):
 class ObjectDetector(BaseService):
     """Object deteciton service, based on MobileNet V2 SSD Coco
     """
-
-    # The neural network should be loaded only once
-    interpreter = None
-    labels = None
-
     def __init__(self, camera, *args, **kwargs):
         if not (backend._USING_TFLITE_RUNTIME or
                 backend._USING_TENSORFLOW_TFLITE):
@@ -176,5 +171,4 @@ class ObjectDetector(BaseService):
             objs = get_output(self.interpreter, 0.4, scale)
 
             # output
-            draw_objects(image, objs, self.labels)
-            yield image
+            yield objs, self.labels

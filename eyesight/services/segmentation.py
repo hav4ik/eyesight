@@ -4,7 +4,6 @@ import numpy as np
 from ..engine.base_service import BaseService
 from ..engine.adapters import get as get_adapter
 from ..utils.generic_utils import Resource
-from ..utils.output_utils import label_to_color_image
 from ..utils import backend_utils as backend
 
 if backend._USING_TENSORFLOW_TFLITE:
@@ -70,42 +69,37 @@ def output_tensor(interpreter, i):
 
 
 class SemanticSegmentator(BaseService):
-    interpreter = None
-
     def __init__(self, camera, *args, **kwargs):
+        self.interpreter = None
+
         super().__init__(
                 adapter=get_adapter('simple')({'cam': camera}),
                 *args, **kwargs)
 
-    @staticmethod
-    def load_model():
+    def load_model(self):
         model_path = Resource(
                 collection_name='mobilenet_v2_deeplab_v3_pascal2012',
                 url='https://github.com/google-coral/'
                     'edgetpu/raw/master/test_data/'
                     'deeplabv3_mnv2_pascal_quant_edgetpu.tflite'
         ).path()
-        SemanticSegmentator.interpreter = make_interpreter(model_path)
-        SemanticSegmentator.interpreter.allocate_tensors()
+        self.interpreter = make_interpreter(model_path)
+        self.interpreter.allocate_tensors()
 
     def _generator(self):
-        if SemanticSegmentator.interpreter is None:
-            SemanticSegmentator.load_model()
+        if self.interpreter is None:
+            self.load_model()
 
         while True:
             image = self._get_inputs('cam')
             scale, img = set_input(
-                    SemanticSegmentator.interpreter,
+                    self.interpreter,
                     (image.shape[1], image.shape[0]),
                     lambda size: cv2.resize(image, size))
 
-            SemanticSegmentator.interpreter.invoke()
-            result = output_tensor(SemanticSegmentator.interpreter, 0)
+            self.interpreter.invoke()
+            result = output_tensor(self.interpreter, 0)
             result = result.copy()[
                     :int(image.shape[0] * scale[0]),
                     :int(image.shape[1] * scale[1])]
-
-            vis_res = label_to_color_image(
-                    result.astype(np.int)).astype(np.uint8)
-            vis_res = 2 * (vis_res // 3) + img // 3
-            yield vis_res
+            yield result
