@@ -1,7 +1,5 @@
 from abc import ABCMeta, abstractmethod
-from copy import deepcopy
 from collections import deque
-import asyncio
 import threading
 import time
 from ..utils.generic_utils import log
@@ -84,34 +82,63 @@ class LatestAdapter(BaseInputAdapter):
     Stores the latest frame of each service and returns when updates
     are available
 
+    IMPORTANT: no locks are needed since adapters are just passing objects
+        through itself without modifying them. So, every assignment here
+        are just name assignments and thus, thread safe.
+
     # Arguments:
         input_services: a `dict` {'service_name': service}, where service
             inherits from BaseService
     """
     def __init__(self, input_services):
         super().__init__(input_services)
-        self._saved_outputs = dict((k, None) for k in input_services.keys())
-        self._coroutines = [
-                self.get(input_id) for input_id in input_services.keys()]
-        self._coroutine_ids = dict(
-                zip(input_services.keys(), range(len(input_services))))
-        self._lock = asyncio.Lock()
+        self._saved_outputs = dict(
+                (input_id, None)
+                for input_id in input_services.keys())
+        self._threads = dict(
+                (input_id, None)
+                for input_id in input_services.keys())
+        self._updated_event = threading.Event()
+        self._stopped = True
 
-    @asyncio.coroutine
-    def get(self, input_id):
+    def start(self):
+        self._stopped = False
+        for input_id in self._input_services:
+            if self._threads[input_id] is None:
+                self._threads[input_id] = threading.Thread(
+                        target=self._update_cache, args=(input_id, ))
+                self._threads[input_id].start()
+
+    def stop(self, wait=False):
+        self._stopped = True
+        if wait and len(self._threads) > 0:
+            for _, thread in self._threads.items():
+                if thread is not None:
+                    thread.join()
+
+    def _update_cache(self, input_id):
         while True:
-            with self._lock:
-                self._saved_outputs[input_id] = \
-                    self._input_services[input_id].query()
-            yield self._saved_outputs[input_id]
+            if self._stopped:
+                break
+            self._saved_outputs[input_id] = \
+                self._input_services[input_id].query()
+            self._updated_event.set()
 
-    async def _get_inputs_internal(self, *input_ids):
-        await asyncio.wait(self._coroutines[self._coroutine_ids[input_ids]],
-                           return_when=asyncio.FIRST_COMPLETED)
-        with self._lock:
-            # TODO: too many copies!
-            return dict((input_id, deepcopy(self._saved_outputs))
-                        for input_id in input_ids)
+        self._threads[input_id] = None
+
+    def _get_inputs_internal(self, *input_ids):
+        if self._stopped:
+            log.error('The adapter is stopped, cannot retrieve anything')
+            return dict((input_id, empty_query) for input_id in input_ids)
+
+        self._updated_event.wait()
+        self._updated_event.clear()
+        ret = dict((input_id, empty_query) for input_id in input_ids)
+        for input_id in input_ids:
+            val = self._saved_outputs[input_id]
+            if val is not None:
+                ret[input_id] = val
+        return ret
 
 
 class SyncAdapter(BaseInputAdapter):
@@ -185,7 +212,8 @@ class SyncAdapter(BaseInputAdapter):
         self._stopped = True
         if wait and len(self._threads) > 0:
             for _, thread in self._threads.items():
-                thread.join()
+                if thread is not None:
+                    thread.join()
 
     def _update_inputs(self, input_id):
         if self._adjust_slowest:
