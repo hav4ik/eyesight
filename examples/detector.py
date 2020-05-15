@@ -24,6 +24,8 @@ if 'SERVICE' in os.environ:
         from eyesight.services import ObjectDetector as Service
     elif os.environ['SERVICE'] == 'sem':
         from eyesight.services import SemanticSegmentator as Service
+    elif os.environ['SERVICE'] == 'track':
+        from eyesight.services import LucasKanadeTracker as Service
     else:
         raise RuntimeError('Unknown SERVICE specified.')
 else:
@@ -41,6 +43,9 @@ if 'SERVICE' in os.environ:
     elif os.environ['SERVICE'] == 'sem':
         output_drawer = DetectronDraw(
                 image_stream=raspberry_cam, segmentator=selected_service)
+    elif os.environ['SERVICE'] == 'track':
+        output_drawer = DetectronDraw(
+                image_stream=raspberry_cam, tracker=selected_service)
 else:
     output_drawer = DetectronDraw(image_stream=raspberry_cam)
 

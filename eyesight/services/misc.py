@@ -8,6 +8,7 @@ from ..engine.adapters import get as get_adapter
 from ..utils.generic_utils import log
 from ..utils.output_utils import draw_objects
 from ..utils.output_utils import label_to_color_image
+from ..utils.output_utils import draw_tracking_sparse
 
 
 class EmptyService(BaseService):
@@ -199,5 +200,9 @@ class DetectronDraw(BaseService):
             if self._has_detector and detections is not None:
                 objects, labels = detections
                 draw_objects(image, objects, labels)
+
+            if self._has_tracker and tracking is not None:
+                prev_points, cur_points = tracking
+                draw_tracking_sparse(image, prev_points, cur_points)
 
             yield image

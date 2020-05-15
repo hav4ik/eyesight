@@ -6,9 +6,10 @@ from .cameras import CVCamera
 from .cameras import ImageCamera
 from .cameras import EmptyCamera
 
-# Neural nets
+# Computer Vision methods
 from .detector import ObjectDetector
 from .segmentation import SemanticSegmentator
+from .tracking import LucasKanadeTracker
 
 # Convenience services
 from .misc import EmptyService

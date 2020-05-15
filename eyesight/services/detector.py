@@ -114,7 +114,7 @@ def make_interpreter(model_file):
 
 
 class ObjectDetector(BaseService):
-    """Object deteciton service, based on MobileNet V2 SSD Coco
+    """Object detection service, based on MobileNet V2 SSD Coco
     """
     def __init__(self, camera, *args, **kwargs):
         if not (backend._USING_TFLITE_RUNTIME or
