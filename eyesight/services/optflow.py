@@ -7,8 +7,18 @@ from ..engine.adapters import get as get_adapter
 from ..utils.generic_utils import log
 
 
-class LucasKanadeTracker(BaseService):
-    """Tracking by keypoints using Lukas-Kanade algorithm
+class OpticalFlowLucasKanade(BaseService):
+    """
+    Tracking by keypoints using Lukas-Kanade algorithm implemented in OpenCV.
+
+    Args:
+      camera: The camera service.
+      renew_after: number of frames, after which the initial Shi-Tomashi
+        points should be renewed.
+      shitomashi_params: a dictionary of params for Shi-Tomashi good tracking
+        points (corner) detector.
+      lucas_kanade_params: a dictionary of params for Lucas-Kanade Optical
+        Flow algorithm.
     """
     def __init__(self,
                  camera,
@@ -94,3 +104,37 @@ class LucasKanadeTracker(BaseService):
                 log.debug('Found {} features to track in {} sec'.format(
                         len(p0), time.time() - begin))
                 elapsed_frames = 0
+
+
+class OpticalFlowFarneback(BaseService):
+
+    def __init__(self, camera, *args, **kwargs):
+        super().__init__(
+                adapter=get_adapter('simple')({'cam': camera}),
+                *args, **kwargs)
+
+    def _generator(self):
+        prev_img = None
+        while True:
+            image = self._get_inputs('cam')
+            assert isinstance(image, np.ndarray)
+            assert len(image.shape) == 2 or (
+                    len(image.shape) == 3 and image.shape[2] == 3)
+
+            # Get image from camera and convert it to grayscale if needed
+            if len(image.shape) == 3:
+                image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+            # Prepare first image if needed
+            if prev_img is None:
+                prev_img = image
+                yield None
+
+            # Calculate optical flow
+            flow = cv2.calcOpticalFlowFarneback(
+                    prev_img, image, flow=None,
+                    pyr_scale=0.5, levels=2, winsize=15, iterations=1,
+                    poly_n=3, poly_sigma=1.2, flags=0)
+
+            yield flow
+            prev_img = image

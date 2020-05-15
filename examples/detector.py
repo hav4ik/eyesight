@@ -25,7 +25,7 @@ if 'SERVICE' in os.environ:
     elif os.environ['SERVICE'] == 'sem':
         from eyesight.services import SemanticSegmentator as Service
     elif os.environ['SERVICE'] == 'track':
-        from eyesight.services import LucasKanadeTracker as Service
+        from eyesight.services import OpticalFlowLucasKanade as Service
     else:
         raise RuntimeError('Unknown SERVICE specified.')
 else:
