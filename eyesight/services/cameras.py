@@ -69,7 +69,7 @@ class PiCamera(BaseService):
                  resolution=(640, 480),
                  framerate=32,
                  sensor_mode=1,
-                 flipud=False,
+                 flipud=True,
                  *args,
                  **kwargs):
 
@@ -83,6 +83,7 @@ class PiCamera(BaseService):
         self.resolution = resolution
         self.framerate = framerate
         self.sensor_mode = sensor_mode
+        self.flipud = flipud
         super().__init__(*args, **kwargs)
 
     def _generator(self):
@@ -98,7 +99,10 @@ class PiCamera(BaseService):
 
             for _ in camera.capture_continuous(
                     raw_capture, format='rgb', use_video_port=True):
-                yield raw_capture.array
+                if self.flipud:
+                    yield np.flipud(raw_capture.array)
+                else:
+                    yield raw_capture.array
                 raw_capture.truncate(0)
 
 

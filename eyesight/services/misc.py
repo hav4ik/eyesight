@@ -194,7 +194,8 @@ class DetectronDraw(BaseService):
                 vis_res = label_to_color_image(
                         segmentation.astype(np.int)).astype(np.uint8)
                 if vis_res.shape != image.shape:
-                    vis_res = cv2.resize(vis_res, image.shape)
+                    vis_res = cv2.resize(
+                            vis_res, (image.shape[1], image.shape[0]))
                 image = 2 * (vis_res // 3) + image // 3
 
             if self._has_detector and detections is not None:

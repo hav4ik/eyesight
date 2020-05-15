@@ -12,7 +12,7 @@ class LucasKanadeTracker(BaseService):
     """
     def __init__(self,
                  camera,
-                 renew_after=200,
+                 renew_after=30,
                  shitomashi_params=None,
                  lucas_kanade_params=None,
                  *args, **kwargs):
@@ -30,7 +30,7 @@ class LucasKanadeTracker(BaseService):
         if self._shi_tomashi_params is None:
             feature_params = dict(
                     maxCorners=100,
-                    qualityLevel=0.3,
+                    qualityLevel=0.03,
                     minDistance=7,
                     blockSize=7)
         else:

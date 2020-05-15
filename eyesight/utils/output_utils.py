@@ -169,5 +169,5 @@ def draw_tracking_sparse(img, prev_points, cur_points):
     for p0, p1 in zip(prev_points, cur_points):
         a, b = p0.ravel()
         c, d = p1.ravel()
-        cv2.circle(img, (c, d), 2, (127, 255, 127), -1)
-        cv2.circle(img, (c, d), 2, (0, 255, 0), -1)
+        cv2.line(img, (a, b), (c, d), (0, 255, 0), 2, cv2.LINE_AA)
+        cv2.circle(img, (c, d), 3, (0, 255, 0), -1)
