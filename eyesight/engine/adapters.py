@@ -176,7 +176,7 @@ class SyncAdapter(BaseInputAdapter):
     """
     def __init__(self,
                  input_services,
-                 max_cache_size=50,
+                 max_cache_size=200,
                  adjust_slowest=True,
                  fps_cache=50):
 

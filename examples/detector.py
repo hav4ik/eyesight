@@ -14,6 +14,8 @@ if 'CAMERA' in os.environ:
         from eyesight.services import CVCamera as Camera
     elif os.environ['CAMERA'] == 'img':
         from eyesight.services import ImageCamera as Camera
+    elif os.environ['CAMERA'] == 'vid':
+        from eyesight.services import VideoFileReader as Camera
     else:
         raise RuntimeError('Unknown CAMERA specified.')
 else:

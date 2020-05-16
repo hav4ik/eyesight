@@ -13,6 +13,8 @@ if 'CAMERA' in os.environ:
         from eyesight.services import CVCamera as Camera
     elif os.environ['CAMERA'] == 'img':
         from eyesight.services import ImageCamera as Camera
+    elif os.environ['CAMERA'] == 'vid':
+        from eyesight.services import VideoFileReader as Camera
     elif os.environ['CAMERA'] == 'empty':
         from eyesight.services import EmptyCamera as Camera
     else:
@@ -25,6 +27,8 @@ if 'SERVICE' in os.environ:
         from eyesight.services import ObjectDetector as Service
     elif os.environ['SERVICE'] == 'sem':
         from eyesight.services import SemanticSegmentator as Service
+    elif os.environ['SERVICE'] == 'track':
+        from eyesight.services import OpticalFlowLucasKanade as Service
     elif os.environ['SERVICE'] == 'draw':
         from eyesight.services import DetectronDraw as Service
     else:

@@ -6,6 +6,7 @@ from .cameras import PiCamera
 from .cameras import CVCamera
 from .cameras import ImageCamera
 from .cameras import EmptyCamera
+from .cameras import VideoFileReader
 
 # Computer Vision methods
 from .detector import ObjectDetector

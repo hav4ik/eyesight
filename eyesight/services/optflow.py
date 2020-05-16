@@ -22,7 +22,7 @@ class OpticalFlowLucasKanade(BaseService):
     """
     def __init__(self,
                  camera,
-                 renew_after=30,
+                 renew_after=60,
                  shitomashi_params=None,
                  lucas_kanade_params=None,
                  *args, **kwargs):

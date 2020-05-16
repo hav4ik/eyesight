@@ -5,6 +5,7 @@ import numpy as np
 from ..engine.base_service import BaseService
 from ..utils.generic_utils import Resource
 from ..utils import backend_utils as backend
+from ..utils.generic_utils import log
 
 import cv2
 if backend._USING_RASPBERRYPI_CAMERA:
@@ -28,7 +29,12 @@ class EmptyCamera(BaseService):
 class ImageCamera(BaseService):
     """To test computer vision algorithms
     """
-    def __init__(self, images=None, size=(640, 480), *args, **kwargs):
+    def __init__(self,
+                 images=None,
+                 cache_images=True,
+                 size=(640, 480),
+                 *args, **kwargs):
+
         if images is None:
             images = [Resource(
                 collection_name='test_images',
@@ -44,13 +50,26 @@ class ImageCamera(BaseService):
             for path in images:
                 self.images.extend(self._get_image_or_imdir(
                     os.path.expanduser(path)))
+
+        self.cache_images = cache_images
         super().__init__(*args, **kwargs)
 
     def _generator(self):
-        while True:
+        if self.cache_images:
+            image_cache = []
             for path in self.images:
                 img = cv2.resize(cv2.imread(path), self.size)
-                yield cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                image_cache.append(img)
+
+        while True:
+            if not self.cache_images:
+                for path in self.images:
+                    img = cv2.resize(cv2.imread(path), self.size)
+                    yield cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            else:
+                for img in image_cache:
+                    yield img
 
     @staticmethod
     def _get_image_or_imdir(path):
@@ -60,6 +79,73 @@ class ImageCamera(BaseService):
             return [path]
         else:
             raise RuntimeError('Path {} does not exist.'.format(path))
+
+
+class VideoFileReader(BaseService):
+    def __init__(self,
+                 video_path=None,
+                 size=(640, 480),
+                 cache_all=True,
+                 target_fps=150,
+                 *args, **kwargs):
+        if video_path is None:
+            self.video_path = Resource(
+                    collection_name='test_videos',
+                    url='https://github.com/hav4ik/static-files/raw/'
+                        'master/eyesight/street_vid.mp4').path()
+        else:
+            self.video_path = video_path
+        self.size = size
+        self.cache_all = cache_all
+        self.target_fps = target_fps
+        super().__init__(*args, **kwargs)
+
+    def _generator(self):
+        cap = cv2.VideoCapture(self.video_path)
+        frame_counter = 0
+
+        if self.cache_all:
+            frame_cache = []
+            while True:
+                ret, frame = cap.read()
+                if not ret:
+                    break
+                frame = cv2.cvtColor(
+                        cv2.resize(frame, self.size), cv2.COLOR_BGR2RGB)
+                frame_cache.append(frame)
+
+            if len(frame_cache) == 0:
+                raise RuntimeError('0 frames in video cache.')
+            cap.release()
+
+        if self.target_fps is not None:
+            prev_iteration = time.time()
+
+        while True:
+            if self.cache_all:
+                yield frame_cache[frame_counter]
+                frame_counter = (frame_counter + 1) % len(frame_cache)
+            else:
+                ret, frame = cap.read()
+                frame_counter += 1
+                if frame_counter == cap.get(cv2.CAP_PROP_FRAME_COUNT):
+                    frame_counter = 0
+                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+
+                if not ret:
+                    log.error('Unable to read a frame from video.')
+                    yield None
+                else:
+                    yield cv2.cvtColor(
+                            cv2.resize(frame, self.size), cv2.COLOR_BGR2RGB)
+
+            if self.target_fps is not None:
+                now = time.time()
+                diff = now - prev_iteration
+                prev_iteration = now
+                target_delay = 1. / self.target_fps
+                if diff < target_delay:
+                    time.sleep(target_delay - diff)
 
 
 class PiCamera(BaseService):
