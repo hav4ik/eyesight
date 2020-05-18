@@ -47,6 +47,12 @@ class ClientEventHandler:
         for ident in inactive_clients:
             self.events.pop(ident, None)
 
+    def register(self):
+        """Invoked from each client's thread to register ahead of time"""
+        ident = threading.get_ident()
+        if ident not in self.events:
+            self.events[ident] = [threading.Event(), time.time()]
+
     def clear(self):
         """Invoked from each client's thread after a frame is processed"""
         self.events[threading.get_ident()][0].clear()
@@ -71,13 +77,25 @@ class BaseService(metaclass=ABCMeta):
     """Base class for each service.
 
     # Arguments
-        input_services: a dict of service instances that may or may not
-            have been started.
+        adapter: an instance of `adapters.BaseInputAdapter`.
+        inactivity_timeout: (in seconds) if inactive more than this amount of
+            time, will automatically shut down.
+        client_timeout: (in seconds) disconnect client services if they were
+            inactive for this amount of time.
+        lock_free: (experimental) whether we should follow the lock-free
+            paradigm and rely minimally on copies. This would require an
+            additional level of carefulness while handling and writing the
+            services.
+        no_copy: (experimental) return values without deep-copying them. This
+            will require certain level of carefulness when handling results of
+            `query()`.
     """
     def __init__(self,
                  adapter=get_adapter('simple')(dict()),
                  inactivity_timeout=10,
-                 client_timeout=5):
+                 client_timeout=5,
+                 lock_free=False,
+                 no_copy=True):
 
         self._thread = None
         self._frame = None
@@ -89,7 +107,12 @@ class BaseService(metaclass=ABCMeta):
         self._input_adapter = adapter
         self._inactivity_timeout = inactivity_timeout
         self._last_access = 0
-        self._lock = rwlock.RWLockFair()
+        self._lock_free = lock_free
+        self._no_copy = no_copy
+
+        if not lock_free:
+            self._lock = rwlock.RWLockFair()
+
         self._event_handler = ClientEventHandler(
                 inactivity_timeout=client_timeout)
 
@@ -138,8 +161,17 @@ class BaseService(metaclass=ABCMeta):
                     '{:.2f} seconds.'.format(
                             class_name(self), self._inactivity_timeout))
         self._event_handler.clear()
-        with self._lock.gen_rlock():
-            return deepcopy(self._history), deepcopy(self._frame)
+        if self._lock_free:
+            if self._no_copy:
+                return self._history, self._frame
+            else:
+                return deepcopy(self._history), deepcopy(self._frame)
+        else:
+            with self._lock.gen_rlock():
+                if self._no_copy:
+                    return self._history, self._frame
+                else:
+                    return deepcopy(self._history), deepcopy(self._frame)
 
     def _update(self):
         """Background thread loop
@@ -147,10 +179,16 @@ class BaseService(metaclass=ABCMeta):
         frames_iterator = self._generator()
         for frame in frames_iterator:
             now = time.time()
-            with self._lock.gen_wlock():
+
+            if self._lock_free:
                 self._history = self._history_tape + [HistoryItem(
                     now, class_name(self))]
                 self._frame = frame
+            else:
+                with self._lock.gen_wlock():
+                    self._history = self._history_tape + [HistoryItem(
+                        now, class_name(self))]
+                    self._frame = frame
 
             self._event_handler.set()
             self._history_tape = []

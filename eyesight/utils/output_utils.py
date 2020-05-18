@@ -1,11 +1,67 @@
 import cv2
 import numpy as np
 import collections
+from ..utils import backend_utils as backend
 
 
 # Structure to hold objects
 DetectionObject = collections.namedtuple(
         'DetectionObject', ['id', 'score', 'bbox'])
+
+
+class BoundingBoxesNP:
+    """Vectorized bounding boxes, harnessing the power of Numpy!
+    """
+    def __init__(self,
+                 class_ids: np.ndarray,
+                 xmin: np.ndarray,
+                 ymin: np.ndarray,
+                 xmax: np.ndarray,
+                 ymax: np.ndarray,
+                 scores: np.ndarray,
+                 threshold: float = None):
+
+        if backend._mode == 'debug':
+            assert len(class_ids.shape) == 1
+            assert len(xmin.shape) == 1
+            assert len(ymin.shape) == 1
+            assert len(xmax.shape) == 1
+            assert len(ymax.shape) == 1
+            assert len(scores.shape) == 1
+
+            assert class_ids.shape[0] == xmin.shape[0]
+            assert class_ids.shape[0] == ymin.shape[0]
+            assert class_ids.shape[0] == xmax.shape[0]
+            assert class_ids.shape[0] == ymax.shape[0]
+            assert class_ids.shape[0] == scores.shape[0]
+
+        self.class_ids = class_ids
+        self.xmin = xmin
+        self.ymin = ymin
+        self.xmax = xmax
+        self.ymax = ymax
+        self.scores = scores
+
+        self.indices = np.arange(class_ids.shape[0])
+        if threshold is not None:
+            self.indices = self.indices[scores >= threshold]
+
+    def __getitem__(self, i):
+        indices = self.indices[i]
+        return self.class_ids[indices], \
+            self.xmin[indices], self.ymin[indices], \
+            self.xmax[indices], self.ymax[indices], \
+            self.scores[indices]
+
+    def __len__(self):
+        return self.indices.shape[0]
+
+    def scale(self, scale_x, scale_y):
+        self.xmin *= scale_x
+        self.xmax *= scale_x
+        self.ymin *= scale_y
+        self.ymax *= scale_y
+        return self
 
 
 class BBox(collections.namedtuple('BBox', ['xmin', 'ymin', 'xmax', 'ymax'])):
@@ -121,6 +177,18 @@ def draw_objects(img, objs, labels):
                   '{:s} ({:.1f}%)'.format(
                       labels.get(obj.id, obj.id), obj.score * 100),
                   (bbox.xmin - 1, bbox.ymin - 1))
+
+
+def draw_objects_np(img, objs, labels):
+    """Draws the bounding box and label for each object."""
+    for i in range(len(objs)):
+        class_id, xmin, ymin, xmax, ymax, score = objs[i]
+        cv2.rectangle(img, (int(xmin), int(ymin)), (int(xmax), int(ymax)),
+                      (0, 255, 0), 2)
+        text_over(img,
+                  '{:s} ({:.1f}%)'.format(
+                      labels.get(int(class_id), str(class_id)),
+                      score * 100), (int(xmin) - 1, int(ymin) - 1))
 
 
 def create_pascal_label_colormap():

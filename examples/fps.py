@@ -44,7 +44,7 @@ log.info('Start measuring')
 
 fps = FPS().start()
 delta = 0.
-while fps._numFrames < 200 and \
+while fps._numFrames < 500 and \
         (datetime.datetime.now() - fps._start).total_seconds() < 10:
     history, frame = stream.query()
     delta += time.time() - history[0].timestamp

@@ -6,7 +6,7 @@ import cv2
 from ..engine.base_service import BaseService
 from ..engine.adapters import get as get_adapter
 from ..utils.generic_utils import log
-from ..utils.output_utils import draw_objects
+from ..utils.output_utils import draw_objects_np
 from ..utils.output_utils import label_to_color_image
 from ..utils.output_utils import draw_tracking_sparse
 
@@ -88,7 +88,7 @@ class PerformanceBar(BaseService):
             if self.n_frames > 0:
                 lst = list(performance_log)
                 avg_fps = len(performance_log) / (
-                        lst[-1].timestamp - lst[0].timestamp)
+                        lst[-1].timestamp - lst[0].timestamp + 1e-6)
                 avg_delay = total_delay / len(performance_log)
             else:
                 now = self._history_tape[-1].timestamp
@@ -184,6 +184,7 @@ class DetectronDraw(BaseService):
                         '`image_stream` yielded None (expected behavior), '
                         'continue.')
                 continue
+
             assert isinstance(image, np.ndarray) and len(image.shape) == 3 \
                 and image.shape[2] == 3 and image.dtype == np.uint8
 
@@ -200,7 +201,7 @@ class DetectronDraw(BaseService):
 
             if self._has_detector and detections is not None:
                 objects, labels = detections
-                draw_objects(image, objects, labels)
+                draw_objects_np(image, objects, labels)
 
             if self._has_tracker and tracking is not None:
                 prev_points, cur_points = tracking

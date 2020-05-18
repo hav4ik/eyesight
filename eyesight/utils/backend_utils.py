@@ -19,6 +19,9 @@ log.debug('[Init] Eyesight dir: {}'.format(_eyesight_dir))
 # Default neural network inference backend: TF-Lite
 _backend = 'tflite'
 
+# There are 2 modes: 'debug' and 'ship'
+_mode = 'debug'
+
 # Additional information about available libraries and modules, all values
 # defaults to `False` or `None`.
 _USING_TFLITE_RUNTIME = False
@@ -38,9 +41,12 @@ if os.path.exists(_config_path):
     except ValueError:
         _config = dict()
     _backend = _config.get('backend', _backend)
+    _mode = _config.get('mode', _mode)
 else:
     _backend = os.environ.get('EYESIGHT_BACKEND', _backend)
+    _mode = os.environ.get('EYESIGHT_MODE', _mode)
 log.debug('[Init] Backend is set to {}'.format(_backend))
+log.debug('[Init] Mode is set to {}'.format(_mode))
 
 # If successfully imported, one can use it as `backend.tflite`.
 if _backend == 'tflite':
@@ -83,5 +89,3 @@ try:
     _USING_RASPBERRYPI_CAMERA = True
 except ImportError:
     _USING_RASPBERRYPI_CAMERA = False
-
-

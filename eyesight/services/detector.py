@@ -4,7 +4,8 @@ import numpy as np
 from ..engine.base_service import BaseService
 from ..engine.adapters import get as get_adapter
 from ..utils.generic_utils import Resource
-from ..utils.output_utils import BBox, DetectionObject
+from ..utils.output_utils import DetectionObject
+from ..utils.output_utils import BoundingBoxesNP
 from ..utils import backend_utils as backend
 
 if backend._USING_TENSORFLOW_TFLITE:
@@ -13,68 +14,10 @@ elif backend._USING_TFLITE_RUNTIME:
     import tflite_runtime.interpreter as tflite
 
 
-def input_size(interpreter):
-    """Returns input image size as (width, height) tuple."""
-    _, height, width, _ = interpreter.get_input_details()[0]['shape']
-    return width, height
-
-
-def input_tensor(interpreter):
-    """Returns input tensor view as numpy array of shape (height, width, 3)."""
-    tensor_index = interpreter.get_input_details()[0]['index']
-    return interpreter.tensor(tensor_index)()[0]
-
-
-def set_input(interpreter, size, resize):
-    """Copies a resized and properly zero-padded image to the input tensor.
-
-    Args:
-        interpreter: Interpreter object.
-        size: original image size as (width, height) tuple.
-        resize: a function that takes a (width, height) tuple, and returns an
-            RGB image resized to those dimensions.
-    Returns:
-        Actual resize ratio, which should be passed to `get_output` function.
-    """
-    width, height = input_size(interpreter)
-    w, h = size
-    scale = min(width / w, height / h)
-    w, h = int(w * scale), int(h * scale)
-    tensor = input_tensor(interpreter)
-    tensor.fill(0)    # padding
-    _, _, channel = tensor.shape
-    tensor[:h, :w] = np.reshape(resize((w, h)), (h, w, channel))
-    return scale, scale
-
-
 def output_tensor(interpreter, i):
     """Returns output tensor view."""
     tensor = interpreter.tensor(interpreter.get_output_details()[i]['index'])()
     return np.squeeze(tensor)
-
-
-def get_output(interpreter, score_threshold, image_scale=(1.0, 1.0)):
-    """Returns list of detected objects."""
-    boxes = output_tensor(interpreter, 0)
-    class_ids = output_tensor(interpreter, 1)
-    scores = output_tensor(interpreter, 2)
-    count = int(output_tensor(interpreter, 3))
-
-    width, height = input_size(interpreter)
-    image_scale_x, image_scale_y = image_scale
-    sx, sy = width / image_scale_x, height / image_scale_y
-
-    def make(i):
-        ymin, xmin, ymax, xmax = boxes[i]
-        return DetectionObject(
-                id=int(class_ids[i]),
-                score=float(scores[i]),
-                bbox=BBox(xmin=xmin,
-                          ymin=ymin,
-                          xmax=xmax,
-                          ymax=ymax).scale(sx, sy).map(int))
-
-    return [make(i) for i in range(count) if scores[i] >= score_threshold]
 
 
 def load_labels(path, encoding='utf-8'):
@@ -130,6 +73,8 @@ class ObjectDetector(BaseService):
 
         self.interpreter = None
         self.labels = None
+        self.cam_width = None
+        self.cam_height = None
 
         super().__init__(
                 adapter=get_adapter('simple')({'cam': camera}),
@@ -142,8 +87,64 @@ class ObjectDetector(BaseService):
                     'edgetpu/raw/master/test_data/'
                     'mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite'
         ).path()
+
+        # Create an interpreter and allocate memory for it
         self.interpreter = make_interpreter(model_path)
         self.interpreter.allocate_tensors()
+
+        # Get input shape
+        _, height, width, _ = self.interpreter.get_input_details()[0]['shape']
+        self.input_height = height
+        self.input_width = width
+
+        # Get index reference to input tensor
+        self.input_tensor_index = \
+                self.interpreter.get_input_details()[0]['index']
+
+        # Get reference to output tensors
+        self.boxes_index = \
+                self.interpreter.get_output_details()[0]['index']
+        self.class_ids_index = \
+                self.interpreter.get_output_details()[1]['index']
+        self.scores_index = \
+                self.interpreter.get_output_details()[2]['index']
+        self.count_index = \
+                self.interpreter.get_output_details()[3]['index']
+
+    def set_interpreter_input(self, image):
+        """Copies a resized and properly zero-padded image to the input tensor.
+        """
+        w, h = image.shape[1], image.shape[0]
+        scale_w, scale_h = self.input_width / w, self.input_height / h
+
+        tensor = self.interpreter.tensor(self.input_tensor_index)()[0]
+        cv2.resize(
+                image,
+                (self.input_width, self.input_height),
+                dst=tensor[:h, :w],
+                interpolation=cv2.INTER_NEAREST)
+        return scale_w, scale_h
+
+    def get_interpreter_output(
+            self, score_threshold=0.4, image_scale=(1., 1.)):
+        image_scale_x, image_scale_y = image_scale
+        sx = self.input_width / image_scale_x
+        sy = self.input_height / image_scale_y
+
+        boxes = np.squeeze(
+                self.interpreter.tensor(self.boxes_index)())
+        class_ids = np.squeeze(
+                self.interpreter.tensor(self.class_ids_index)())
+        scores = np.squeeze(
+                self.interpreter.tensor(self.scores_index)())
+        count = int(np.squeeze(
+            self.interpreter.tensor(self.count_index)()))
+
+        return BoundingBoxesNP(
+                class_ids[:count].copy(),
+                boxes[:count, 1].copy(), boxes[:count, 0].copy(),
+                boxes[:count, 3].copy(), boxes[:count, 2].copy(),
+                scores[:count].copy(), score_threshold).scale(sx, sy)
 
     def load_labels(self):
         labels_path = Resource(
@@ -161,14 +162,11 @@ class ObjectDetector(BaseService):
         while True:
             # image preprocess
             image = self._get_inputs('cam')
-            scale = set_input(
-                    self.interpreter,
-                    (image.shape[1], image.shape[0]),
-                    lambda size: cv2.resize(image, size))
+            scale_w, scale_h = self.set_interpreter_input(image)
 
             # inference
             self.interpreter.invoke()
-            objs = get_output(self.interpreter, 0.4, scale)
 
             # output
+            objs = self.get_interpreter_output(0.4, (scale_w, scale_h))
             yield objs, self.labels
