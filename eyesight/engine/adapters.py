@@ -141,6 +141,67 @@ class LatestAdapter(BaseInputAdapter):
         return ret
 
 
+class CachedAdapter(BaseInputAdapter):
+    """
+    Stores the cached latest frame of each service and returns it when
+    requested (so the latest frame can be returned multiple times, if
+    the input frequency is lower than query frequency).
+
+    IMPORTANT: no locks are needed since adapters are just passing objects
+        through itself without modifying them. So, every assignment here
+        are just name assignments and thus, thread safe.
+
+    # Arguments:
+        input_services: a `dict` {'service_name': service}, where service
+            inherits from BaseService
+    """
+    def __init__(self, input_services):
+        super().__init__(input_services)
+        self._saved_outputs = dict(
+                (input_id, None)
+                for input_id in input_services.keys())
+        self._threads = dict(
+                (input_id, None)
+                for input_id in input_services.keys())
+        self._stopped = True
+
+    def start(self):
+        self._stopped = False
+        for input_id in self._input_services:
+            if self._threads[input_id] is None:
+                self._threads[input_id] = threading.Thread(
+                        target=self._update_cache, args=(input_id, ))
+                self._threads[input_id].start()
+
+    def stop(self, wait=False):
+        self._stopped = True
+        if wait and len(self._threads) > 0:
+            for _, thread in self._threads.items():
+                if thread is not None:
+                    thread.join()
+
+    def _update_cache(self, input_id):
+        while True:
+            if self._stopped:
+                break
+            self._saved_outputs[input_id] = \
+                self._input_services[input_id].query()
+
+        self._threads[input_id] = None
+
+    def _get_inputs_internal(self, *input_ids):
+        if self._stopped:
+            log.error('The adapter is stopped, cannot retrieve anything')
+            return dict((input_id, empty_query) for input_id in input_ids)
+
+        ret = dict((input_id, empty_query) for input_id in input_ids)
+        for input_id in input_ids:
+            val = self._saved_outputs[input_id]
+            if val is not None:
+                ret[input_id] = val
+        return ret
+
+
 class SyncAdapter(BaseInputAdapter):
     """
     Returns only the frames with closest timestamps, as illustrated below:
@@ -334,6 +395,8 @@ def get(identifier):
             return LatestAdapter
         elif identifier == 'sync':
             return SyncAdapter
+        elif identifier == 'cached':
+            return CachedAdapter
     elif isinstance(identifier, BaseInputAdapter):
         return identifier
     else:

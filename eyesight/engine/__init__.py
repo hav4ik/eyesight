@@ -5,3 +5,4 @@ from .adapters import BaseInputAdapter
 from .adapters import SimpleAdapter
 from .adapters import LatestAdapter
 from .adapters import MultiAdapter
+from .adapters import CachedAdapter
