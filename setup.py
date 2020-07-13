@@ -14,5 +14,6 @@ setup(name='Eyesight',
                         'numpy>=1.17.0',
                         'tflite-runtime>=2.1.0.post1',
                         'imutils>=0.5.3',
-                        'Flask>=1.1.1'],
+                        'Flask>=1.1.1',
+                        'scikit-image>=0.17.0'],
       packages=find_packages())

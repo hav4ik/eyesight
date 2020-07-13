@@ -196,8 +196,8 @@ def create_pascal_label_colormap():
     Returns:
         A Colormap for visualizing segmentation results.
     """
-    colormap = np.zeros((256, 3), dtype=int)
-    indices = np.arange(256, dtype=int)
+    colormap = np.zeros((256, 3), dtype=np.uint8)
+    indices = np.arange(256, dtype=np.uint8)
 
     for shift in reversed(range(8)):
         for channel in range(3):

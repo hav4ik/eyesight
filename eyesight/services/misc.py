@@ -153,11 +153,13 @@ class DetectronDraw(BaseService):
                  image_stream,
                  detector=None,
                  segmentator=None,
-                 tracker=None):
+                 tracker=None,
+                 contours=None):
 
         self._has_detector = False
         self._has_segmentator = False
         self._has_tracker = False
+        self._has_contours = False
         input_services = {'image_stream': image_stream}
 
         if detector is not None:
@@ -172,12 +174,18 @@ class DetectronDraw(BaseService):
             self._has_tracker = True
             input_services['tracker'] = tracker
 
+        if contours is not None:
+            self._has_contours = True
+            input_services['contours'] = contours
+
         super().__init__(adapter=get_adapter('sync')(input_services))
 
     def _generator(self):
         while True:
-            image, detections, segmentation, tracking = self._get_inputs(
-                    'image_stream', 'detector', 'segmentator', 'tracker')
+            ret_val = self._get_inputs(
+                    'image_stream', 'detector', 'segmentator', 'tracker',
+                    'contours')
+            image, detections, segmentation, tracking, contours = ret_val
 
             if image is None:
                 log.warning(
@@ -206,5 +214,8 @@ class DetectronDraw(BaseService):
             if self._has_tracker and tracking is not None:
                 prev_points, cur_points = tracking
                 draw_tracking_sparse(image, prev_points, cur_points)
+
+            if self._has_contours and contours is not None:
+                cv2.drawContours(image, contours, -1, (0, 255, 255), 2)
 
             yield image

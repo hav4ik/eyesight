@@ -86,7 +86,7 @@ class VideoFileReader(BaseService):
                  video_path=None,
                  size=(640, 480),
                  cache_all=True,
-                 target_fps=100,
+                 target_fps=200,
                  *args, **kwargs):
         if video_path is None:
             self.video_path = Resource(
@@ -185,10 +185,20 @@ class PiCamera(BaseService):
 
             for _ in camera.capture_continuous(
                     raw_capture, format='rgb', use_video_port=True):
+
+                # we try to keep the copies at minimum amount, so if
+                # self._no_copy is True, we don't need to make a copy
+                # right here.
                 if self.flipud:
-                    yield np.flipud(raw_capture.array)
+                    if self._no_copy:
+                        yield np.flipud(raw_capture.array).copy()
+                    else:
+                        yield np.flipud(raw_capture.array)
                 else:
-                    yield raw_capture.array
+                    if self._no_copy:
+                        yield raw_capture.array.copy()
+                    else:
+                        yield raw_capture.array
                 raw_capture.truncate(0)
 
 

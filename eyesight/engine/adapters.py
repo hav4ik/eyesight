@@ -369,7 +369,7 @@ class MultiAdapter(BaseInputAdapter):
     Combination of adapters, so that the user can flexibly define
     data reading patterns.
     """
-    def __init__(self, input_adapters):
+    def __init__(self, *input_adapters):
         services = dict()
         for adapter in input_adapters:
             services.extend(adapter._input_services)
@@ -381,8 +381,10 @@ class MultiAdapter(BaseInputAdapter):
         for adapter in self._input_adapters:
             sub_input_ids = list(set(input_ids).union(
                 set(adapter._input_services.keys())))
-            ret_dict.extend(adapter.get_input(sub_input_ids))
-        return sub_input_ids
+            if len(sub_input_ids) > 0:
+                sub_inputs = adapter.get_input(*sub_input_ids)
+                ret_dict.extend(dict(zip(sub_input_ids, sub_inputs)))
+        return ret_dict
 
 
 def get(identifier):
