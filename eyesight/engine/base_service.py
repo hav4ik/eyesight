@@ -233,6 +233,13 @@ class BaseService(metaclass=ABCMeta):
 
         return tuple(inputs) if len(inputs) > 1 else inputs[0]
 
+    def _safe_resolve_input(self, value, readonly=True):
+        if not readonly:
+            if self._no_copy:
+                return deepcopy(value)
+            else:
+                return value
+
     @property
     def manager(self):
         return self._manager

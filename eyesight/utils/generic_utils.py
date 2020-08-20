@@ -84,7 +84,7 @@ class Resource:
             os.makedirs(collection_dir)
 
         # retrieving resource path
-        self._path = self.retrieve(url, collection_dir)
+        self._path = self.retrieve(url, collection_dir, is_archive)
 
     def path(self):
         return self._path
@@ -94,29 +94,28 @@ class Resource:
         file_name = os.path.basename(url)
         download_path = os.path.join(folder, file_name)
 
-        formats = [".zip", ".tar", ".gztar", ".bztar", ".xztar"]
         if is_archive:
-            for dirname in [
-                    download_path.rsplit(f, 1)[0] for f in formats
-                    if f in download_path]:
-                if os.path.isdir(dirname):
-                    return dirname
-        else:
-            if os.path.exists(download_path):
-                return download_path
+            formats = [".zip", ".tar", ".gztar", ".bztar", ".xztar"]
+            archive_format = None
+            for f in formats:
+                if download_path[-len(f):] == f:
+                    archive_format = f
 
-        if not os.path.exists(download_path):
-            wget.download(url, download_path)
+            if archive_format is None:
+                raise RuntimeError('Only [{}] formats are supported.'.format(
+                    ', '.join(formats)))
 
-        if is_archive:
-            shutil.unpack_archive(download_path, folder)
-            os.remove(download_path)
-            for dirname in [
-                    download_path.rsplit(f, 1)[0] for f in formats
-                    if f in download_path]:
-                if os.path.isdir(dirname):
-                    return dirname
+            dirname = download_path.rsplit(archive_format, 1)[0]
+            if not os.path.isdir(dirname):
+                wget.download(url, download_path)
+                shutil.unpack_archive(
+                        download_path, os.path.join(folder, dirname))
+                os.remove(download_path)
+            return dirname
+
         else:
+            if not os.path.exists(download_path):
+                wget.download(url, download_path)
             return download_path
 
 

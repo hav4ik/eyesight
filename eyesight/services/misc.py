@@ -186,6 +186,7 @@ class DetectronDraw(BaseService):
                     'image_stream', 'detector', 'segmentator', 'tracker',
                     'contours')
             image, detections, segmentation, tracking, contours = ret_val
+            image = self._safe_resolve_input(image, readonly=False)
 
             if image is None:
                 log.warning(
