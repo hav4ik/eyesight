@@ -110,7 +110,7 @@ class OpticalFlowFarneback(BaseService):
 
     def __init__(self, camera, *args, **kwargs):
         super().__init__(
-                adapter=get_adapter('simple')({'cam': camera}),
+                adapter=get_adapter('cached')({'cam': camera}),
                 *args, **kwargs)
 
     def _generator(self):

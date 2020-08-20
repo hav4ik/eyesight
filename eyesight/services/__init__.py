@@ -11,6 +11,7 @@ from .cameras import VideoFileReader
 # Computer Vision methods
 from .detector import ObjectDetector
 from .segmentation import SemanticSegmentator
+from .segmentation import SegmentationExtrapolator
 from .optflow import OpticalFlowLucasKanade
 from .optflow import OpticalFlowFarneback
 
