@@ -1,5 +1,9 @@
 # Eyesight
 
+[![Python 3.6](https://img.shields.io/badge/python-3.6-blue.svg)](https://www.python.org/downloads/release/python-360/)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Travis CI](https://api.travis-ci.com/hav4ik/eyesight.svg?branch=master)](https://travis-ci.com/github/hav4ik/eyesight/builds/)
+
 Eyesight is a high-level minimalistic framework for Computer Vision on the Edge, written in Python. It was developed with focus on performance. Supports Coral Edge TPU, Pi Camera, and more.
 
 # Installation

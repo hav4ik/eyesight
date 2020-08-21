@@ -1,6 +1,7 @@
 import os
 import yaml
 import platform
+import importlib
 
 from .generic_utils import log
 
@@ -87,8 +88,9 @@ else:
 
 # If we can import picamera, i.e. we are on a Raspberry Pi
 try:
-    import picamera
-    log.debug('[Init] Found picamera module.')
-    _USING_RASPBERRYPI_CAMERA = True
+    picam_spec = importlib.util.find_spec('picamera')
+    if picam_spec is not None:
+        log.debug('[Init] Found picamera module.')
+        _USING_RASPBERRYPI_CAMERA = True
 except ImportError:
     _USING_RASPBERRYPI_CAMERA = False
