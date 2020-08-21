@@ -1,10 +1,10 @@
+import os
 import cv2
 import numpy as np
 
 from ..engine.base_service import BaseService
 from ..engine.adapters import get as get_adapter
 from ..utils.generic_utils import Resource
-from ..utils.output_utils import DetectionObject
 from ..utils.output_utils import BoundingBoxesNP
 from ..utils import backend_utils as backend
 
@@ -44,13 +44,16 @@ def load_labels(path, encoding='utf-8'):
 def make_interpreter(model_file):
     model_file, *device = model_file.split('@')
     try:
-        interpreter = tflite.Interpreter(
-                model_path=model_file,
-                experimental_delegates=[
-                    tflite.load_delegate(
-                        backend._EDGETPU_SHARED_LIB,
-                        {'device': device[0]} if device else {})
-                ])
+        if backend._USING_EDGE_TPU:
+            interpreter = tflite.Interpreter(
+                    model_path=model_file,
+                    experimental_delegates=[
+                        tflite.load_delegate(
+                            backend._EDGETPU_SHARED_LIB,
+                            {'device': device[0]} if device else {})
+                    ])
+        else:
+            interpreter = tflite.Interpreter(model_path=model_file)
     except ValueError:
         interpreter = tflite.Interpreter(model_path=model_file)
     return interpreter
@@ -66,11 +69,6 @@ class ObjectDetector(BaseService):
                     'TensorflowLite not found. Install it with '
                     '`pip install tflite_runtime`.')
 
-        if not backend._USING_EDGE_TPU:
-            raise NotImplementedError(
-                    'libedgetpu for Coral Edge TPU not found. Make sure '
-                    'that you have it installed.')
-
         self.interpreter = None
         self.labels = None
         self.cam_width = None
@@ -81,12 +79,24 @@ class ObjectDetector(BaseService):
                 *args, **kwargs)
 
     def load_model(self):
-        model_path = Resource(
+        """Load the model and allocate memory for it
+        """
+        if backend._USING_EDGE_TPU:
+            model_path = Resource(
                 collection_name='mobilenet_ssd_v2_coco',
                 url='https://github.com/google-coral/'
                     'edgetpu/raw/master/test_data/'
                     'mobilenet_ssd_v2_coco_quant_postprocess_edgetpu.tflite'
-        ).path()
+            ).path()
+        else:
+            archive_path = Resource(
+                collection_name='mobilenet_ssd_v1_coco',
+                url='https://storage.googleapis.com/'
+                    'download.tensorflow.org/models/tflite/'
+                    'coco_ssd_mobilenet_v1_1.0_quant_2018_06_29.zip',
+                is_archive=True,
+            ).path()
+            model_path = os.path.join(archive_path, 'detect.tflite')
 
         # Create an interpreter and allocate memory for it
         self.interpreter = make_interpreter(model_path)
@@ -99,17 +109,17 @@ class ObjectDetector(BaseService):
 
         # Get index reference to input tensor
         self.input_tensor_index = \
-                self.interpreter.get_input_details()[0]['index']
+            self.interpreter.get_input_details()[0]['index']
 
         # Get reference to output tensors
         self.boxes_index = \
-                self.interpreter.get_output_details()[0]['index']
+            self.interpreter.get_output_details()[0]['index']
         self.class_ids_index = \
-                self.interpreter.get_output_details()[1]['index']
+            self.interpreter.get_output_details()[1]['index']
         self.scores_index = \
-                self.interpreter.get_output_details()[2]['index']
+            self.interpreter.get_output_details()[2]['index']
         self.count_index = \
-                self.interpreter.get_output_details()[3]['index']
+            self.interpreter.get_output_details()[3]['index']
 
     def set_interpreter_input(self, image):
         """Copies a resized and properly zero-padded image to the input tensor.
@@ -144,7 +154,9 @@ class ObjectDetector(BaseService):
                 class_ids[:count].copy(),
                 boxes[:count, 1].copy(), boxes[:count, 0].copy(),
                 boxes[:count, 3].copy(), boxes[:count, 2].copy(),
-                scores[:count].copy(), score_threshold).scale(sx, sy)
+                scores[:count].copy(),
+                score_threshold
+            ).scale(sx, sy)
 
     def load_labels(self):
         labels_path = Resource(

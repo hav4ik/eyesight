@@ -73,7 +73,10 @@ if _backend == 'tflite':
     }[platform.system()]
 
     try:
-        tflite.load_delegate(_EDGETPU_SHARED_LIB)
+        if _USING_TENSORFLOW_TFLITE:
+            tflite.experimental.load_delegate(_EDGETPU_SHARED_LIB)
+        elif _USING_TFLITE_RUNTIME:
+            tflite.load_delegate(_EDGETPU_SHARED_LIB)
         _USING_EDGE_TPU = True
         log.debug('[Init] Using Google Coral Edge TPU.')
     except (ValueError, RuntimeError):
