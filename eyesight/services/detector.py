@@ -54,6 +54,7 @@ def make_interpreter(model_file):
                     ])
         else:
             interpreter = tflite.Interpreter(model_path=model_file)
+
     except ValueError:
         interpreter = tflite.Interpreter(model_path=model_file)
     return interpreter

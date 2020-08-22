@@ -219,8 +219,16 @@ class CVCamera(BaseService):
             raise RuntimeError('Could not start camera.')
 
         while True:
-            ret, img = camera.read()
+            try:
+                ret, img = camera.read()
+            except:
+                camera.release()
+                camera = cv2.VideoCapture(self.video_source)
+                ret, img = camera.read()
+
             if not ret:
                 raise RuntimeError('Next frames are not available.')
                 break
             yield img
+
+        camera.release()

@@ -35,6 +35,11 @@ def set_input(interpreter, size, resize):
     tensor.fill(0)    # padding
     _, _, channel = tensor.shape
     img = resize((w, h))
+
+    # TODO: find a CPU model that doesn't require input normalization
+    if not backend._USING_EDGE_TPU:
+        img = (img.astype(np.float32) - 127.5) / 127.5
+
     tensor[:h, :w] = np.reshape(img, (h, w, channel))
     return (scale, scale), img
 
@@ -42,13 +47,17 @@ def set_input(interpreter, size, resize):
 def make_interpreter(model_file):
     model_file, *device = model_file.split('@')
     try:
-        interpreter = tflite.Interpreter(
-                model_path=model_file,
-                experimental_delegates=[
-                    tflite.load_delegate(
-                        backend._EDGETPU_SHARED_LIB,
-                        {'device': device[0]} if device else {})
-                ])
+        if backend._USING_EDGE_TPU:
+            interpreter = tflite.Interpreter(
+                    model_path=model_file,
+                    experimental_delegates=[
+                        tflite.load_delegate(
+                            backend._EDGETPU_SHARED_LIB,
+                            {'device': device[0]} if device else {})
+                    ])
+        else:
+            interpreter = tflite.Interpreter(model_path=model_file)
+
     except ValueError:
         interpreter = tflite.Interpreter(model_path=model_file)
     return interpreter
@@ -81,12 +90,22 @@ class SemanticSegmentator(BaseService):
                 *args, **kwargs)
 
     def load_model(self):
-        model_path = Resource(
-                collection_name='mobilenet_v2_deeplab_v3_pascal2012',
-                url='https://github.com/google-coral/'
-                    'edgetpu/raw/master/test_data/'
-                    'deeplabv3_mnv2_pascal_quant_edgetpu.tflite'
-        ).path()
+        if backend._USING_EDGE_TPU:
+            model_path = Resource(
+                    collection_name='mobilenet_v2_deeplab_v3_pascal2012',
+                    url='https://github.com/google-coral/'
+                        'edgetpu/raw/master/test_data/'
+                        'deeplabv3_mnv2_pascal_quant_edgetpu.tflite'
+            ).path()
+        else:
+            model_path = Resource(
+                    collection_name='mobilenet_v2_deeplab_v3_pascal2012',
+                    url='https://storage.googleapis.com/'
+                        'download.tensorflow.org/models/tflite/gpu/'
+                        'deeplabv3_257_mv_gpu.tflite'
+            ).path()
+
+        # Create an interpreter and allocate memory for it
         self.interpreter = make_interpreter(model_path)
         self.interpreter.allocate_tensors()
 
@@ -106,6 +125,11 @@ class SemanticSegmentator(BaseService):
             result = result.copy()[
                     :int(image.shape[0] * scale[0]),
                     :int(image.shape[1] * scale[1])]
+
+            # TODO: find a model that doesn't need this softmax
+            if not backend._USING_EDGE_TPU:
+                result = np.argmax(result, axis=2)
+
             yield result
 
 
@@ -123,7 +147,8 @@ class SegmentationExtrapolator(BaseService):
         super().__init__(adapter=get_adapter('latest')(input_services))
 
     def _process_class(self, sx, sy):
-        raw_cntrs = cv2.findContours(self.tmp_canvas, cv2.RETR_EXTERNAL,
+        raw_cntrs = cv2.findContours(
+                self.tmp_canvas, cv2.RETR_EXTERNAL,
                 cv2.CHAIN_APPROX_SIMPLE)
         raw_cntrs = imutils.grab_contours(raw_cntrs)
 
@@ -161,5 +186,6 @@ class SegmentationExtrapolator(BaseService):
 
             self._process_class(sx, sy)
             end = time.time()
-            # log.warn('perm={}, fps={}'.format(end - begin, 1. / (end - begin)))
+            # log.warn('perm={}, fps={}'.format(
+            #     end - begin, 1. / (end - begin)))
             yield self.cntrs
