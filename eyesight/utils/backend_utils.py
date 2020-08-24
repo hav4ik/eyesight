@@ -73,15 +73,15 @@ if _backend == 'tflite':
         'Windows': 'edgetpu.dll'
     }[platform.system()]
 
-    try:
-        if _USING_TENSORFLOW_TFLITE:
-            tflite.experimental.load_delegate(_EDGETPU_SHARED_LIB)
-        elif _USING_TFLITE_RUNTIME:
-            tflite.load_delegate(_EDGETPU_SHARED_LIB)
-        _USING_EDGE_TPU = True
-        log.debug('[Init] Using Google Coral Edge TPU.')
-    except (ValueError, RuntimeError, OSError, AttributeError):
-        _EDGETPU_SHARED_LIB = None
+    # try:
+    #     if _USING_TENSORFLOW_TFLITE:
+    #         tflite.experimental.load_delegate(_EDGETPU_SHARED_LIB)
+    #     elif _USING_TFLITE_RUNTIME:
+    #         tflite.load_delegate(_EDGETPU_SHARED_LIB)
+    #     _USING_EDGE_TPU = True
+    #     log.debug('[Init] Using Google Coral Edge TPU.')
+    # except (ValueError, RuntimeError, OSError, AttributeError):
+    #     _EDGETPU_SHARED_LIB = None
 
 else:
     raise ValueError('Backend `{}` not supported.'.format(_backend))
