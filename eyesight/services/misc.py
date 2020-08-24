@@ -178,7 +178,7 @@ class DetectronDraw(BaseService):
             self._has_contours = True
             input_services['contours'] = contours
 
-        super().__init__(adapter=get_adapter('sync')(input_services))
+        super().__init__(adapter=get_adapter('latest')(input_services))
 
     def _generator(self):
         while True:
