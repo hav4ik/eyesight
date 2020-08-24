@@ -86,7 +86,7 @@ class VideoFileReader(BaseService):
                  video_path=None,
                  size=(640, 480),
                  cache_all=True,
-                 target_fps=200,
+                 target_fps=60,
                  *args, **kwargs):
         if video_path is None:
             self.video_path = Resource(
