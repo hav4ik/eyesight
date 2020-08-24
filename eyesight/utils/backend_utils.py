@@ -57,12 +57,12 @@ if _backend == 'tflite':
         import tflite_runtime.interpreter as tflite
         _USING_TFLITE_RUNTIME = True
         log.debug('[Init] Using `tflite` from `tflite_runtime`.')
-    except ImportError:
+    except (ImportError, ModuleNotFoundError):
         try:
             import tensorflow.lite as tflite
             _USING_TENSORFLOW_TFLITE = True
             log.debug('[Init] Using `tflite` from `tensorflow`.')
-        except ImportError as e:
+        except (ImportError, ModuleNotFoundError) as e:
             raise ImportError(
                 'Backend "tflite" not found. Please make sure that either'
                 'tensorflow or tflite_runtime is installed') from e
@@ -80,7 +80,7 @@ if _backend == 'tflite':
             tflite.load_delegate(_EDGETPU_SHARED_LIB)
         _USING_EDGE_TPU = True
         log.debug('[Init] Using Google Coral Edge TPU.')
-    except (ValueError, RuntimeError):
+    except (ValueError, RuntimeError, OSError, AttributeError):
         _EDGETPU_SHARED_LIB = None
 
 else:
